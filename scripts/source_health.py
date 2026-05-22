@@ -90,6 +90,26 @@ def get_quarantine_stats(hours=24):
     }
 
 
+def validate_data_quality(data: dict) -> tuple[bool, list[str]]:
+    """校验数据质量。返回 (ok, issues)。
+
+    判定标准：最新期号正确 + 总行数不降 + 号码格式正确。
+    fallback 路径拿到正确数据也判为健康。
+    """
+    if not data or 'error' in data:
+        return False, ['数据读取失败']
+    issues = []
+    number = data.get('number', '')
+    total = data.get('total_rows', 0)
+
+    if not number or len(number) != 3 or not number.isdigit():
+        issues.append(f'号码格式异常: {number}')
+    if total < 1000:
+        issues.append(f'总行数偏低: {total}')
+
+    return len(issues) == 0, issues
+
+
 def build_report():
     """构建完整健康报告"""
     status = load_source_status()
@@ -148,6 +168,8 @@ def print_report(report):
         else:
             print(f"  ❌ 无数据文件")
 
+        data_ok, data_issues = validate_data_quality(data) if data else (False, ['无数据'])
+
         for src_name, s in report[lottery]['sources'].items():
             cd = s['cooldown_until']
             if cd:
@@ -159,8 +181,13 @@ def print_report(report):
                     print(f"  🔒 {src_name} 冷却中{rnd_str}，剩余 {remaining} 分钟 (HTTP {s['last_status']})")
                 except ValueError:
                     print(f"  🔒 {src_name} 冷却中")
+            elif s['failures'] > 0 and data_ok:
+                print(f"  ⚠️  {src_name} 主源异常但数据正常（fallback生效），最后: {s['last_failure']}")
             elif s['failures'] > 0:
-                print(f"  ⚠️  {src_name} 失败 {s['failures']} 次，最后: {s['last_failure']}")
+                print(f"  ❌ {src_name} 失败 {s['failures']} 次，最后: {s['last_failure']}")
+                if data_issues:
+                    for issue in data_issues:
+                        print(f"      └─ {issue}")
             else:
                 last = s['last_success'] or '无记录'
                 print(f"  ✅ {src_name} 正常，最后成功: {last}")

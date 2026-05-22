@@ -53,6 +53,7 @@ def check_data(df: pd.DataFrame, lottery_name: str) -> dict:
         '检查时间': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         '总行数': len(df),
         '异常': [],
+        '警告': [],
         '通过': True,
     }
     
@@ -61,7 +62,13 @@ def check_data(df: pd.DataFrame, lottery_name: str) -> dict:
     null_cols = null_counts[null_counts > 0]
     if len(null_cols) > 0:
         for col, cnt in null_cols.items():
-            report['异常'].append(f"{col} 有 {cnt} 个空值")
+            if col == '日期':
+                report['警告'].append(
+                    f"日期 有 {cnt} 个空值"
+                    f"（历史种子数据格式问题，已按期号排序继续处理，不影响评分）"
+                )
+            else:
+                report['异常'].append(f"{col} 有 {cnt} 个空值")
     
     # 1.2 期号检查
     if '期数' in df.columns:
@@ -101,6 +108,7 @@ def check_data(df: pd.DataFrame, lottery_name: str) -> dict:
     
     # 汇总
     report['异常数'] = len(report['异常'])
+    report['警告数'] = len(report['警告'])
     report['通过'] = len(report['异常']) == 0
     
     return report
@@ -123,6 +131,11 @@ def print_check_report(report: dict):
         print(f"\n  ⚠️  建议检查数据源后重试")
     else:
         print(f"\n  ✅ 数据检查通过，无异常")
+
+    if report['警告数'] > 0:
+        print(f"\n  ⚠️  {report['警告数']} 个警告（不影响评分）:")
+        for w in report['警告']:
+            print(f"     - {w}")
     print(f"{'='*50}\n")
 
 

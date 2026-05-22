@@ -92,7 +92,8 @@ def check_group(pred: tuple, actual: tuple) -> bool:
 
 def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
                  test_periods: int = 100, train_window: int = 100,
-                 lottery_code: str = 'pls', weight_path: str = None) -> dict:
+                 lottery_code: str = 'pls', weight_path: str = None,
+                 seed: int = None) -> dict:
     """
     Walk-forward 滚动回测
     
@@ -112,7 +113,7 @@ def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
         '动态评分': {'hits_direct': 0, 'hits_group': 0, 'hits_group3': 0, 'hits_group6': 0, 'candidates': [], 'miss_streak': 0, 'max_miss_streak': 0},
     }
     
-    rng = random.Random(42)  # 固定种子，保证可复现
+    rng = random.Random(seed if seed is not None else 42)
 
     # 加载权重（支持自定义路径）
     weights, params = load_weights(weight_path)

@@ -94,8 +94,14 @@ def build_yaml(sample):
 
 # ── 评分 ──────────────────────────────────────────────
 
-def composite_score(result: dict, periods: int) -> float:
-    """综合分 = 直选命中率*30 + 组选命中率*20 - 最大连未*2 + ROI/5"""
+def composite_score(result: dict, periods: int, baseline: dict = None) -> float:
+    """综合分 = 命中率加权 + ROI - 连未惩罚 + 止损护栏扣分。
+
+    止损护栏：
+    - ROI < 随机中位数 → -5
+    - ROI < -10% → -10
+    - 最大连续未中 > 20 → -3
+    """
     sr = result.get('动态评分', {})
     direct = float(sr.get('直选命中', 0)) / periods
     group = float(sr.get('组选命中', 0)) / periods
@@ -107,10 +113,67 @@ def composite_score(result: dict, periods: int) -> float:
     except (ValueError, TypeError):
         roi = 0.0
 
-    return direct * 30 + group * 20 - max_miss * 2 + roi / 5
+    base = direct * 30 + group * 20 - max_miss * 2 + roi / 5
+    penalty = 0
+
+    if baseline and baseline.get('median') is not None:
+        if roi < baseline['median']:
+            penalty -= 5
+
+    if roi < -10:
+        penalty -= 10
+
+    if max_miss > 20:
+        penalty -= 3
+
+    return base + penalty
 
 
-def run_one_trial(sample, df, theory, top_k, periods, lottery):
+def benchmark_random(df, theory, top_k, periods, lottery, seeds=100):
+    """随机策略多 seed 基线：跑 N 次随机选号回测，输出 ROI 分布百分位。
+
+    返回 dict: {mean, median, p25, p75, max_miss_p75, seeds, raw_rois}
+    """
+    try:
+        from backtest import walk_forward
+    except ImportError:
+        print("  [错误] 无法导入 backtest 模块")
+        return {'mean': 0, 'median': 0, 'p25': 0, 'p75': 0, 'max_miss_p75': 0, 'seeds': 0}
+
+    rois = []
+    max_misses = []
+    print(f"  随机基线: 跑 {seeds} seed...", end="", flush=True)
+
+    for s in range(seeds):
+        bt = walk_forward(df, theory, top_k=top_k,
+                          test_periods=periods, train_window=100,
+                          lottery_code=lottery, weight_path=None,
+                          seed=s)
+        sr = bt.get('随机策略', bt.get('动态评分', {}))
+        roi_str = sr.get('ROI', '0%').replace('%', '')
+        try:
+            roi = float(roi_str)
+        except (ValueError, TypeError):
+            roi = 0.0
+        rois.append(roi)
+        max_misses.append(int(sr.get('最大连续未中', 0)))
+
+    rois = sorted(rois)
+    n = len(rois)
+    result = {
+        'mean': round(sum(rois) / n, 1),
+        'median': round(rois[n // 2], 1),
+        'p25': round(rois[n // 4], 1),
+        'p75': round(rois[3 * n // 4], 1),
+        'max_miss_p75': int(sorted(max_misses)[3 * n // 4]),
+        'seeds': seeds,
+        'raw_rois': rois,
+    }
+    print(f" 中位数={result['median']}% P25={result['p25']}% P75={result['p75']}%")
+    return result
+
+
+def run_one_trial(sample, df, theory, top_k, periods, lottery, baseline=None):
     """执行单次回测试验，返回 (score, backtest_result)"""
     yaml_str = build_yaml(sample)
     with tempfile.NamedTemporaryFile(
@@ -123,7 +186,7 @@ def run_one_trial(sample, df, theory, top_k, periods, lottery):
         bt = walk_forward(df, theory, top_k=top_k,
                           test_periods=periods, train_window=100,
                           lottery_code=lottery, weight_path=tmp_path)
-        score = composite_score(bt, periods)
+        score = composite_score(bt, periods, baseline)
     except Exception:
         score = -999
         bt = {}
@@ -132,7 +195,7 @@ def run_one_trial(sample, df, theory, top_k, periods, lottery):
     return score, bt
 
 
-def search_random(df, theory, args):
+def search_random(df, theory, args, baseline=None):
     """随机搜索"""
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -143,7 +206,8 @@ def search_random(df, theory, args):
 
     for i in range(args.trials):
         sample = sample_weights()
-        score, bt = run_one_trial(sample, df, theory, args.top_k, args.periods, args.lottery)
+        score, bt = run_one_trial(sample, df, theory, args.top_k, args.periods,
+                                   args.lottery, baseline)
         results.append({'trial': i + 1, 'weights': sample, 'score': score, 'backtest': bt})
 
         if score > best_score:
@@ -156,7 +220,7 @@ def search_random(df, theory, args):
     return results, best_sample
 
 
-def search_optuna(df, theory, args):
+def search_optuna(df, theory, args, baseline=None):
     """贝叶斯优化搜索（Optuna）"""
     import optuna
 
@@ -168,7 +232,8 @@ def search_optuna(df, theory, args):
             else:
                 sample[k] = trial.suggest_int(k, lo, hi)
 
-        score, _ = run_one_trial(sample, df, theory, args.top_k, args.periods, args.lottery)
+        score, _ = run_one_trial(sample, df, theory, args.top_k, args.periods,
+                                  args.lottery, baseline)
         return score
 
     study = optuna.create_study(
@@ -209,6 +274,10 @@ def main():
                         help='推荐注数（默认30）')
     parser.add_argument('--seed', type=int, default=42,
                         help='随机种子（默认42）')
+    parser.add_argument('--baseline-seeds', type=int, default=100,
+                        help='随机基准采样次数（默认100）')
+    parser.add_argument('--no-baseline', action='store_true',
+                        help='跳过随机基准（加速测试）')
     args = parser.parse_args()
 
     # ── 门槛守卫 ──
@@ -250,6 +319,18 @@ def main():
     from stats_engine import generate_theoretical_distribution
     theory = generate_theoretical_distribution()
 
+    # ── 随机基准 ──
+    baseline = None
+    if not args.no_baseline:
+        print(f"\n{'='*60}")
+        print(f"  📊 随机策略基准")
+        print(f"{'='*60}")
+        baseline = benchmark_random(df, theory, args.top_k, args.periods,
+                                     args.lottery, args.baseline_seeds)
+        print(f"  ROI: 均值={baseline['mean']}% 中位数={baseline['median']}% "
+              f"P25={baseline['p25']}% P75={baseline['p75']}%")
+        print(f"  最长连未 P75: {baseline['max_miss_p75']} 期")
+
     # ── 搜索 ──
     method_label = '贝叶斯优化(Optuna TPE)' if args.method == 'optuna' else '随机搜索'
 
@@ -257,12 +338,14 @@ def main():
     print(f"  🔧 {lottery_name} 权重调优 [{method_label}]")
     print(f"{'='*60}")
     print(f"  数据: {len(df)} 期 | 回测窗口: {args.periods} 期 | 搜索: {args.trials} 次")
+    if baseline:
+        print(f"  止损: ROI<{baseline['median']}% -5 | ROI<-10% -10 | 连未>20 -3")
     print(f"  {'─'*60}")
 
     if args.method == 'optuna':
-        results, best_sample = search_optuna(df, theory, args)
+        results, best_sample = search_optuna(df, theory, args, baseline)
     else:
-        results, best_sample = search_random(df, theory, args)
+        results, best_sample = search_random(df, theory, args, baseline)
 
     # ── 排序输出 ──
     results.sort(key=lambda x: x['score'], reverse=True)
@@ -285,24 +368,41 @@ def main():
                   f"组选{sr.get('组选命中','?')}/{args.periods} | "
                   f"ROI={sr.get('ROI','?')} | 最长连未={sr.get('最大连续未中','?')}期")
 
-    # ── 保存最佳 ──
+    # ── 上线门槛 ──
+    deployable = True
     if best_sample:
-        # 对最佳权重做一次完整回测（Optuna 模式下补上 backtest 明细）
-        if args.method == 'optuna':
-            _, bt_best = run_one_trial(best_sample, df, theory, args.top_k, args.periods, args.lottery)
-        else:
-            bt_best = results[0].get('backtest', {})
+        bt_best = (results[0].get('backtest', {}) if args.method != 'optuna'
+                   else run_one_trial(best_sample, df, theory, args.top_k,
+                                       args.periods, args.lottery, baseline)[1])
+        sr_best = bt_best.get('动态评分', {})
+        best_roi_str = sr_best.get('ROI', '0%').replace('%', '')
+        try:
+            best_roi = float(best_roi_str)
+        except (ValueError, TypeError):
+            best_roi = 0.0
 
-        output_dir = BASE_DIR / 'rules'
-        best_path = output_dir / f'scoring_weights_{args.lottery}_tuned.yaml'
-        best_yaml = build_yaml(best_sample)
-        best_path.write_text(best_yaml, encoding='utf-8')
-        print(f"\n  💾 最佳权重已保存: {best_path}")
+        if baseline and best_roi < baseline['median']:
+            print(f"\n  ⛔ 上线驳回: 最佳ROI({best_roi}%) < 随机中位数({baseline['median']}%)")
+            deployable = False
+        elif best_roi < -10:
+            print(f"\n  ⛔ 上线驳回: ROI严重亏损 ({best_roi}%)")
+            deployable = False
 
-        # 保存完整搜索结果
+    # ── 保存最佳（候选人文件，不覆盖正式权重）──
+    if best_sample:
         log_dir = BASE_DIR / 'output' / 'tuning'
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f'{args.lottery}_tuning_{datetime.now().strftime("%Y%m%d_%H%M")}.json'
+
+        # 候选权重 → output/tuning/（不写入 rules/，防止意外上线）
+        ts = datetime.now().strftime("%Y%m%d_%H%M")
+        candidate_path = log_dir / f'scoring_weights_{args.lottery}_candidate_{ts}.yaml'
+        candidate_yaml = build_yaml(best_sample)
+        candidate_path.write_text(candidate_yaml, encoding='utf-8')
+        status = '候选（待人工审核）' if deployable else '候选（不推荐上线）'
+        print(f"\n  💾 候选权重已保存 [{status}]: {candidate_path}")
+
+        # 搜索记录
+        log_path = log_dir / f'{args.lottery}_tuning_{ts}.json'
         serializable = []
         for r in results[:10]:
             serializable.append({
@@ -311,6 +411,8 @@ def main():
                 'weights': {k: (float(v) if isinstance(v, (int, float)) else v) for k, v in r['weights'].items()},
                 'backtest_summary': {k: v for k, v in r.get('backtest', {}).get('动态评分', {}).items()},
             })
+        if baseline:
+            serializable.append({'random_baseline': baseline})
         with open(log_path, 'w', encoding='utf-8') as f:
             json.dump(serializable, f, ensure_ascii=False, indent=2)
         print(f"  💾 搜索记录: {log_path}")
@@ -359,6 +461,7 @@ def main():
 
             if rel_change > 50:
                 stability = '⚠️ 不稳定（差异 {:.0f}%）— 最佳权重可能过拟合'.format(rel_change)
+                deployable = False
             elif rel_change > 25:
                 stability = '🟡 一般（差异 {:.0f}%）— 权重尚可但不够稳健'.format(rel_change)
             else:
@@ -366,7 +469,16 @@ def main():
 
             print(f"  → {stability}")
 
-    print(f"\n{'='*60}\n")
+    # ── 最终结论 ──
+    print(f"\n{'='*60}")
+    if deployable and best_sample:
+        print(f"  ✅ 候选权重通过全部检查，可人工审核后上线")
+        print(f"  上线方法: cp {candidate_path} rules/scoring_weights_{args.lottery}_tuned.yaml")
+    elif best_sample:
+        print(f"  ⚠️  候选权重未通过安全检查，请勿上线")
+    else:
+        print(f"  ⛔ 未找到有效权重")
+    print(f"{'='*60}\n")
 
 
 if __name__ == '__main__':

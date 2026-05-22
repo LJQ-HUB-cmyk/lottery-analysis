@@ -386,6 +386,12 @@ def generate_predictions(all_df, stats, theory, weights, params,
             '组选': result['组选'],
         })
 
+    # 校验：group_number 必须是号码的数字排序结果
+    for c in scored:
+        expected_group = ''.join(sorted(c['号码']))
+        assert expected_group == c['group_number'], \
+            f"group_number 不一致: 号码={c['号码']}, group_number={c['group_number']}, 期望={expected_group}"
+
     # 多样性调整
     scored = apply_diversity(scored, weights, params)
 
@@ -407,7 +413,7 @@ def _add_reason(rank, c):
     # 展示理由（适合微信/Hermes推送，中文描述）
     total = c['总分']
     dim_text = ' '.join(top_reasons)
-    display = f"第{rank}名 | {c['号码']} ({c['形态']}) | 总分{total} | {dim_text}"
+    display = f"第{rank}名 | 直选{c['号码']}｜组选{c['group_number']} | {c['形态']} | 总分{total} | {dim_text}"
 
     # 一句话说明（适合自然语言推送）
     one_line = (
