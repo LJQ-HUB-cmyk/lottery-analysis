@@ -1,7 +1,7 @@
 # Hermes 定时任务配置
 
 > 此文件供 Hermes 读取并自动配置定时任务。修改此文件后，同步至 Hermes 平台生效。
-> 最后更新：2026-05-21（v2.14.0：推送脚本统一软链接 + KL8 推送链路修复 + KRON 任务梳理）
+> 最后更新：2026-05-22（v2.15.0：Job 架构改造 — shell 薄入口 + Python job 业务逻辑 + dedup_key 去重 + status.json）
 
 ---
 
@@ -36,14 +36,14 @@ cron_mode = allow
 
 [task-predict-generate]
 cron = 30 14 * * *
-command = cd /path/to/lottery-analysis && python run_daily.py --strategy all --top-k 30
+command = cd /home/admin/bendi/lottery-analysis && python run_daily.py --strategy all --top-k 30
 on_failure = continue
 deliver = local
 description = 预生成预测（辅助，失败不影响14:40推送）
 
 [task-predict-health]
 cron = 35 14 * * *
-command = cd /path/to/lottery-analysis && python scripts/source_health.py --json --output output/reports/source_health.json
+command = cd /home/admin/bendi/lottery-analysis && python scripts/source_health.py --json --output output/reports/source_health.json
 on_failure = continue
 deliver = local
 description = 生成数据源健康报告
@@ -136,22 +136,35 @@ Hermes 执行环境需配置以下变量：
 
 ```
 下午（14:30 ~ 14:40）：预测推送
-  ├── 14:30 run_daily → 抓数据 + 特征 + 统计 + 三策略评分
-  ├── 14:35 source_health → 健康报告
-  └── 14:40 lottery_predict_push.sh（自闭环）→ 内含 run_daily + source_health + hermes_push --force
-      └── 不读 review_history，只含预测数据，不含复盘
+  ├── 14:30 run_daily → 抓数据 + 特征 + 统计 + 三策略评分（辅助预生成）
+  ├── 14:35 source_health → 健康报告（辅助）
+  └── 14:40 lottery_predict_push.sh（自闭环）
+      └── lottery_predict_job.py → run_daily + source_health + hermes_push
+          └── dedup_key = predict:{date}:pls-{issue}:d3-{issue}
 
 晚上（21:35 / 22:05 / 23:10）：复盘推送
-  ├── daily_review → 拉取开奖 + 特征 + compare_result
-  └── lottery_review_push.sh（自闭环）→ 内含 daily_review + hermes_push --mode review
-      ├── 21:35/22:05: --complete-only 模式，未齐静默跳过
-      ├── 23:10: --final-check 模式，未齐推送兜底通知（脚本自动检测时间）
-      └── send_log + 文件锁 防重复推送
+  └── lottery_review_push.sh --stage normal|final
+      └── lottery_review_job.py → daily_review + 开奖齐全判断 + hermes_push
+          ├── normal: 两彩种未齐 → skipped_waiting，不推送
+          ├── final: 未齐 → 推送兜底通知（dedup_key=review_missing:{date}）
+          └── 齐全 → dedup_key = review:{date}:pls-{issue}:d3-{issue}
 
-快乐8（独立模块，自闭环 shell 脚本）：
-  14:50 → kl8_predict_push.sh → fetcher + predictor + stats + hermes_push
-  22:00 → check.py → 全链路健康检查（agent 任务）
-  22:15 → kl8_review_push.sh → fetcher + reviewer + metrics + hermes_push
+快乐8（独立模块）：
+  14:50 → kl8_predict_push.sh → kl8_predict_job.py
+          └── dedup_key = kl8_predict:{issue}
+  22:00 → check.py → 全链路健康检查
+  22:15 → kl8_review_push.sh → kl8_review_job.py
+          └── 删旧文件 + 时间戳校验 + dedup_key = kl8_review:{issue}
+```
+
+**架构层次：**
+
+```
+Hermes / cron            → 定时触发
+scripts/push/*.sh        → 薄入口：切目录、加锁、日志、启动 Python
+scripts/jobs/*.py        → 业务编排：拉取、预测/复盘、状态判断、去重
+scripts/hermes_push.py   → 推送内容生成 + 去重 + 发送
+output/status/*.json     → 每次任务的状态记录
 ```
 
 **核心改进：**
@@ -171,8 +184,8 @@ Hermes 执行环境需配置以下变量：
 
 ```
 时间: 14:30
-命令: python run_daily.py --strategy all --top-k 30
-失败处理: 必须成功，失败则停止后续任务
+命令: cd /home/admin/bendi/lottery-analysis && .venv/bin/python run_daily.py --strategy all --top-k 30
+失败处理: 允许失败（辅助任务，失败不影响14:40自闭环推送）
 说明: 数据抓取 → 特征工程 → 统计 → 三策略评分
       生成 latest_*.json 和按期号归档的 *_predict_{issue}.json
 ```
@@ -331,8 +344,12 @@ python scripts/data_fetcher.py --cb-status
 | `output/push/review_report.md` | 复盘日报落盘 |
 | `output/push/daily_report.md` | 旧版混合日报落盘（兼容） |
 | `output/push/pending_*_report.md` | 推送失败时待补发的内容 |
-| `output/push/send_log.jsonl` | 发送记录（逐行 JSON，含 hash 去重） |
+| `output/push/send_log.jsonl` | 发送记录（逐行 JSON，含 dedup_key 业务键 + hash 去重） |
 | `output/push/push_state.json` | 期号级防重状态（按 `日期_模式` 记录） |
+| `output/status/kl8_review.json` | KL8 复盘状态 |
+| `output/status/kl8_predict.json` | KL8 预测状态 |
+| `output/status/lottery_review.json` | PLS/D3 复盘状态 |
+| `output/status/lottery_predict.json` | PLS/D3 预测状态 |
 
 ---
 
@@ -352,11 +369,14 @@ python scripts/data_fetcher.py --cb-status
 
 1. **两段式推送** — 预测单独推，复盘单独推，期号语义清晰无混淆
 2. **预测按期号归档** — `*_predict_{issue}.json` 持久化，复盘按实开期号查找对应预测
-3. **防重复推送** — `send_log.jsonl` + 文件锁 记录每期推送状态，多轮 cron 不重复轰炸（`push_state.json` 仅用于直接 webhook 路径）
+3. **防重复推送** — `send_log.jsonl` 业务键（dedup_key）去重 + 文件锁，同一期号同日不重复推送。dedup_key 按期号计算，不受推送文本微小变化影响
 4. **失败隔离** — 复盘失败不阻塞预测，健康报告失败不阻塞推送
 5. **落盘优先** — 先写 `*_report.md` 再推送，推送失败内容不丢
 6. **指数冷却** — sporttery API 连续失败后冷却 2h→6h→12h→24h
 7. **stdout 隔离** — `--stdout` 模式只输出正文到 stdout，日志/警告全部走 stderr
+8. **统一退出码** — 0=正常（含等待开奖/已推送跳过），2=业务异常（阻断推送），3=环境异常（venv缺失等）
+9. **Shell 薄入口** — 脚本只负责 cd/加锁/启动 Python/写日志，不做业务判断
+10. **状态可追踪** — 每个任务写 `output/status/*.json`，含 status/dedup_key/issues/reason
 
 ---
 
