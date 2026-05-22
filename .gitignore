@@ -36,6 +36,14 @@ data/kl8/*
 !data/kl8/kl8_history.csv
 !data/kl8/kl8_latest.json
 
+# 回测报告
+!output/backtests/
+!output/backtests/*.json
+
+# 测试记录
+!output/tests/
+!output/tests/*.md
+
 # 推送运行时数据
 output/push/*.jsonl
 output/push/pending_*.md
