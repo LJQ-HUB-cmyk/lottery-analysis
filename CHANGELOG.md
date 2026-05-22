@@ -2,6 +2,26 @@
 
 > 集中式变更日志，按版本从新到旧排列。单日详细记录见 `changelog/` 目录。
 
+## v2.15.0 (2026-05-22)
+
+- **Job 架构改造**：Shell 脚本瘦身为薄入口（cd/加锁/启动Python/日志），业务逻辑迁移到 Python job
+- **新增 4 个 Python job**：`scripts/jobs/kl8_review_job.py`（删旧文件+时间戳+期号三重校验）、`lottery_review_job.py`（--stage normal/final 开奖齐全判断）、`kl8_predict_job.py`、`lottery_predict_job.py`
+- **新增统一状态库**：`scripts/lib/job_status.py`，5 种状态枚举（ready/pushed/skipped_waiting/skipped_already_sent/error）
+- **去重升级**：hermes_push.py 新增 `already_sent_by_key` + `--dedup-key` CLI 参数，从文本 hash 去重升级为业务键（按期号）去重
+- **daily_review.py 失败控制**：`run()` 返回值聚合，真正异常 exit 2 阻断推送
+- **全流程锁**：kl8_review_push.sh + lottery_review_push.sh 添加 flock，防止三波任务重叠执行
+- **cron 推送去 --force**：kl8_predict_push.sh + lottery_predict_push.sh 去掉 --force，靠 dedup_key 去重
+- **统一退出码**：0=正常（含等待开奖），2=业务异常，3=环境异常
+- **状态可追踪**：新增 `output/status/` 目录，每次任务写 status JSON
+
+## v2.14.0 (2026-05-21)
+
+- **推送脚本部署修复**：`~/.hermes/scripts/` 软链接被 Hermes 安全策略拦截，改为实体文件复制
+- **KL8 推送链路修复**：kl8_predict_push.sh / kl8_review_push.sh 文件缺失导致 cron 任务失败，新建实体文件
+- **lottery_review_push.sh 旧版同步**：旧版缺少日志/--complete-only/--final-check/--final 参数，同步到新版
+- **HERMES_CONFIG 更新**：6→9 任务，时间修正，KL8 健康检查新增
+- **维护方式确立**：改项目 `scripts/push/` 后需手动 `cp` 到 `~/.hermes/scripts/`
+
 ## v2.13.0 (2026-05-21)
 
 - **晚间复盘完整性闸门**：双彩种齐全才推送，--complete-only(21:35/22:05)/--final-check(23:10) 区分波浪

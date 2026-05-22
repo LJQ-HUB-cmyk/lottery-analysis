@@ -20,36 +20,38 @@
 |------|------|------|:----:|:----:|
 | 14:30 | `python run_daily.py --strategy all --top-k 30` | 预生成预测（辅助） | agent | ⚠️ 有 |
 | 14:35 | `python scripts/source_health.py --json --output output/reports/source_health.json` | 健康报告（辅助） | agent | ⚠️ 有 |
-| 14:40 | `scripts/push/lottery_predict_push.sh`（自闭环） | **run_daily + source_health + hermes_push --force** | **no_agent** | **✅ 无** |
+| 14:40 | `scripts/push/lottery_predict_push.sh`（自闭环） | **run_daily + source_health + hermes_push** | **no_agent** | **✅ 无** |
 
-> `lottery_predict_push.sh` 内部依次执行：run_daily → source_health → hermes_push --mode predict --stdout --force。
-> 加 `--force` 避免当天因去重命中后无输出。
+> `lottery_predict_push.sh` 内部：lottery_predict_job.py → run_daily → source_health → hermes_push --mode predict --stdout。
+> 业务键（dedup_key）去重，不加 --force。
 
 ### 晚间复盘链路（21:35 / 22:05 / 23:10 三波补偿）
 
-> 每波执行 `lottery_review_push.sh`（内部：daily_review.py && hermes_push.py --mode review --stdout）。
-> `push_state.json` 防重复推送。复盘推送**不加 --force**，避免多波补偿重复推送。
+> 每波执行 `lottery_review_push.sh`（内部：lottery_review_job.py --stage normal|final）。
+> Shell 薄入口只负责 cd/加锁/启动 Python/日志。Python job 负责开奖齐全判断 + 去重 + 推送。
+> 去重靠 dedup_key（业务键），同一期号同日不重复推送。
 
 | 时间 | 命令 | 模式 | 审批 |
 |------|------|:----:|:----:|
-| 21:35 | `scripts/push/lottery_review_push.sh` | **no_agent** ✅ | **无** |
-| 22:05 | 同上（push_state.json 自动去重） | **no_agent** ✅ | **无** |
-| 23:10 | 同上（push_state.json 自动去重） | **no_agent** ✅ | **无** |
+| 21:35 | `scripts/push/lottery_review_push.sh`（--stage normal） | **no_agent** ✅ | **无** |
+| 22:05 | 同上（dedup_key 自动去重） | **no_agent** ✅ | **无** |
+| 23:10 | 同上（--stage final，未齐推送兜底通知） | **no_agent** ✅ | **无** |
 
-> `daily_review.py` 内部依次执行：data_fetcher → feature_engine → compare_result(三策略) → review_summary。
-> `hermes_push.py --mode review` 只读 review_history + compare JSON，不含预测。compare_result 返回 `waiting_actual` 时跳过推送不报错。
-> 推送失败时内容落盘 `output/push/pending_*_report.md`，可手动 `--force` 补发。
+> `lottery_review_job.py --stage normal`：两彩种齐全才推送，未齐 → skipped_waiting → exit 0。
+> `lottery_review_job.py --stage final`：齐全推完整复盘，未齐推兜底通知（dedup_key=review_missing:{date}）。
+> `daily_review.py` 异常时 exit 2，阻断推送。推送失败时内容落盘 `output/push/pending_*_report.md`，可手动 `--force` 补发。
 
 ### 快乐8候选池链路（自闭环 shell 脚本推送）
 
 > KL8 独立推送，不接入 run_daily.py，不和 PLS/D3 混合。
-> 所有推送类任务通过 `~/.hermes/scripts/` 下的软链接指向项目 `scripts/push/`，更新项目脚本后自动生效。
+> Shell 薄入口调用 Python job：kl8_predict_job.py / kl8_review_job.py。
+> kl8_review_job.py 包含删旧文件+时间戳+期号三重校验，防止旧数据误推。
 
 | 时间 | 命令 | 说明 |
 |------|------|------|
-| 14:50 | `bash scripts/push/kl8_predict_push.sh` | 自闭环：fetcher → predictor → stats → hermes_push |
+| 14:50 | `bash scripts/push/kl8_predict_push.sh` | 自闭环：kl8_predict_job.py → fetcher → predictor → stats → hermes_push |
 | 22:00 | `python scripts/kl8/check.py` | 全链路健康检查（agent 任务，deliver=local） |
-| 22:15 | `bash scripts/push/kl8_review_push.sh` | 自闭环：fetcher → reviewer → metrics → hermes_push（错开22:05避免冲突） |
+| 22:15 | `bash scripts/push/kl8_review_push.sh` | 自闭环：kl8_review_job.py → fetcher → reviewer → metrics → hermes_push（错开22:05避免冲突） |
 
 > 快乐8每期开20个号码(1-80)。策略：热号12+冷号8混合生成20码池 + 选四主推。复盘计算命中数/奖金/盈亏。累计表现自动追踪近N期。
 >
@@ -87,9 +89,18 @@ lottery-analysis/
 │   │   ├── metrics.py          # 近N期累计成本/奖金/盈亏
 │   │   ├── stats.py            # 奇偶/大小/连号/和值/冷热统计
 │   │   └── strategy.py         # 4策略统一接口（暂不启用）
-│   └── push/                   # Hermes cron no_agent 推送脚本
-│       ├── lottery_predict_push.sh  # 预测推送（自闭环：run_daily→source_health→push）
-│       └── lottery_review_push.sh   # 复盘推送（daily_review→push）
+│   ├── jobs/                    # Python job 业务编排（Shell 薄入口调用）
+│   │   ├── lottery_predict_job.py   # PLS/D3 预测编排
+│   │   ├── lottery_review_job.py    # PLS/D3 复盘编排（--stage normal/final）
+│   │   ├── kl8_predict_job.py       # KL8 预测编排
+│   │   └── kl8_review_job.py        # KL8 复盘编排（删旧文件+时间戳+期号校验）
+│   ├── lib/                     # 共享库
+│   │   └── job_status.py            # 统一状态文件读写（5种状态枚举）
+│   └── push/                   # Hermes cron no_agent 推送脚本（薄入口）
+│       ├── lottery_predict_push.sh  # 预测推送（→ lottery_predict_job.py）
+│       ├── lottery_review_push.sh   # 复盘推送（→ lottery_review_job.py）
+│       ├── kl8_predict_push.sh      # KL8预测推送（→ kl8_predict_job.py）
+│       └── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
 ├── rules/
 │   ├── scoring_weights.yaml              # 默认权重
 │   ├── scoring_weights_conservative.yaml # 稳健策略
@@ -110,6 +121,7 @@ lottery-analysis/
     ├── charts/      # 可视化图表
     ├── kl8/         # 快乐8预测+复盘输出
     ├── push/        # 推送日报 + 发送日志 + pending补发
+    ├── status/      # 任务状态JSON（git忽略，运行时产物）
     └── tuning/      # 调参记录
 ```
 
@@ -179,6 +191,25 @@ python scripts/hermes_push.py --mode predict --write-only  # 只生成不推送
 python scripts/hermes_push.py --mode daily               # 旧版混合日报（兼容）
 ```
 
+### Job 架构（Shell 薄入口 → Python 业务编排）
+
+```bash
+# 晚间复盘（推荐使用，替代直接调 daily_review + hermes_push）
+python scripts/jobs/lottery_review_job.py --stage normal   # 两彩种齐全才推送
+python scripts/jobs/lottery_review_job.py --stage final    # 不齐也推送兜底通知
+
+# KL8 复盘（含删旧文件+时间戳+期号三重校验）
+python scripts/jobs/kl8_review_job.py
+
+# 预测
+python scripts/jobs/lottery_predict_job.py    # PLS/D3 预测
+python scripts/jobs/kl8_predict_job.py        # KL8 预测
+```
+
+> Job 负责全部业务判断（开奖齐全/期号校验/去重/状态写入），Shell 只做 cd/加锁/启动/日志。
+> 每个 Job 写入 `output/status/*.json`，状态枚举：ready/pushed/skipped_waiting/skipped_already_sent/error。
+> 退出码：0=正常（含等待开奖），2=业务异常，3=环境异常。
+
 ### 快乐8
 
 ```bash
@@ -238,6 +269,18 @@ compare_result.py → output/reports/*_compare_latest.json + output/reviews/revi
 review_summary.py → 终端表现摘要
 ```
 
+### Job 编排层
+
+```
+scripts/push/*.sh（薄入口：cd/加锁/日志）
+    ↓
+scripts/jobs/*.py（业务编排：拉取→判断→复盘→去重→推送）
+    ↓
+scripts/hermes_push.py（推送内容生成 + dedup_key去重 + 发送）
+    ↓
+output/status/*.json（任务状态记录）
+```
+
 ## 关键设计决策
 
 1. **不硬过滤**：1000 注全部打分排序，不做硬规则排除（豹子除外）
@@ -251,6 +294,11 @@ review_summary.py → 终端表现摘要
 9. **不做 LSTM/ML 直接预测号码**：彩票无时间依赖，ML 不优于统计方法
 10. **快乐8独立模块不接入主流程**：`scripts/kl8/` 7个文件（fetcher/predictor/reviewer/check/metrics/stats/strategy），热号+冷号策略 + 选四主推 + 盈亏复盘 + 累计表现，与 PLS/D3 互不干扰。多策略框架已就绪，待 ≥30 天数据后回测评估
 11. **号码始终当字符串**：防止前导零丢失（040→40）
+12. **Shell 薄入口 + Python Job 编排**：Shell 只做 cd/加锁/启动/日志，不做业务判断。所有业务逻辑（开奖齐全、期号校验、是否推送）在 Python job 层
+13. **业务键去重（dedup_key）**：`review:date:pls-issue:d3-issue` / `kl8_review:issue` / `predict:date:pls-issue:d3-issue`，同一期号同日不重复推送，不受文本微小变化影响
+14. **统一退出码**：0=正常（含等待开奖/已推送跳过），2=业务异常（阻断推送），3=环境异常（venv缺失）
+15. **状态可追踪**：每个 Job 写 `output/status/*.json`，含 status/dedup_key/issues/reason，排查不再靠 grep 日志猜测
+16. **KL8 复盘三重防旧数据**：删旧文件 → 时间戳校验 → 期号匹配预测期号，防止旧文件被误推
 
 ## 未解决问题
 
