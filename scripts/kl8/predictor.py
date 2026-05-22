@@ -8,6 +8,8 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from scripts.kl8.common import parse_kl8_numbers
+
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
@@ -24,7 +26,7 @@ def load_history(n: int = 50) -> list[list[int]]:
     draws = []
     with open(p, encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
-            nums = [int(x) for x in row["numbers"].split()]
+            nums = parse_kl8_numbers(row.get("numbers", ""))
             if len(nums) == 20:
                 draws.append(nums)
     return draws[:n]
@@ -84,8 +86,7 @@ def pick_play4(pool: list[int], draws: list[list[int]], top_n: int = 4) -> list[
 def predict(latest_issue: str, pool_size: int = 20, hot_ratio: float = 0.6) -> dict:
     draws = load_history()
     if not draws:
-        print("[ERROR] 无历史数据，请先运行 kl8/fetcher.py", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError("无历史数据，无法生成预测。请先运行 kl8/fetcher.py")
 
     pool = build_candidate_pool(draws, pool_size=pool_size, hot_ratio=hot_ratio)
     play4 = pick_play4(pool, draws)
@@ -142,7 +143,11 @@ def main():
     latest_data = json.loads(latest_path.read_text(encoding="utf-8"))
     latest_issue = latest_data["issue"]
 
-    data = predict(latest_issue, pool_size=args.pool_size, hot_ratio=args.hot_ratio)
+    try:
+        data = predict(latest_issue, pool_size=args.pool_size, hot_ratio=args.hot_ratio)
+    except RuntimeError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(1)
     path = save_prediction(data)
 
     pool = data["candidate_pool"]

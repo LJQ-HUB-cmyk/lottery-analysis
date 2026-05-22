@@ -7,6 +7,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from scripts.kl8.common import parse_kl8_numbers
+
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
@@ -26,7 +28,7 @@ def find_actual_by_issue(target_issue: str) -> dict | None:
                     "lottery": "kl8",
                     "issue": row["issue"],
                     "date": row["date"],
-                    "numbers": [int(x) for x in row["numbers"].split()],
+                    "numbers": parse_kl8_numbers(row.get("numbers", "")),
                 }
     return None
 

@@ -7,6 +7,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from scripts.kl8.common import parse_kl8_numbers
+
 import requests
 
 BASE = Path(__file__).resolve().parent.parent.parent
@@ -112,7 +114,7 @@ def check_integrity() -> list[str]:
     for r in rows:
         issue = r.get("issue", "")
         nums_str = r.get("numbers", "")
-        nums = [int(x) for x in nums_str.split()] if nums_str.strip() else []
+        nums = parse_kl8_numbers(nums_str) if nums_str.strip() else []
         try:
             validate(nums)
         except ValueError as e:

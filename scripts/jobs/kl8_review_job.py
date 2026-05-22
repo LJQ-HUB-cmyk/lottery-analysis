@@ -137,8 +137,17 @@ def main():
             write("kl8_review", status)
             sys.exit(2)
 
+        # 期号闸门：预测文件缺失时不得继续
+        if not target_issue:
+            status["status"] = SKIPPED_WAITING
+            status["should_push"] = False
+            status["reason"] = "预测文件缺失或 predicted_issue 为空，无法确定目标期号"
+            print(f"[SKIP] {status['reason']}", file=sys.stderr)
+            write("kl8_review", status)
+            sys.exit(0)
+
         # 期号闸门：复盘期号必须匹配预测期号
-        if target_issue and review_issue != target_issue:
+        if review_issue != target_issue:
             status["status"] = SKIPPED_WAITING
             status["should_push"] = False
             status["reason"] = f"复盘期号 {review_issue} ≠ 预测期号 {target_issue}，等待新数据"

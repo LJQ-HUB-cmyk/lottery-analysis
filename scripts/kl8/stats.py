@@ -6,6 +6,8 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from scripts.kl8.common import parse_kl8_numbers
+
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
@@ -21,7 +23,7 @@ def load_draws(n: int = 50) -> list[list[int]]:
     draws = []
     with open(p, encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
-            nums = [int(x) for x in row["numbers"].split()]
+            nums = parse_kl8_numbers(row.get("numbers", ""))
             if len(nums) == 20:
                 draws.append(nums)
     return draws[:n]

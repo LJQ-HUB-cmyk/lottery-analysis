@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.kl8.common import parse_kl8_numbers
+
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
@@ -36,10 +38,14 @@ def check_history():
         rows = list(csv.DictReader(f))
     ok(f"{len(rows)} 期")
 
+    if len(rows) == 0:
+        warn("kl8_history.csv 为空（仅表头或无数据），请先运行 fetcher.py")
+        return
+
     seen = set()
     for r in rows:
         issue = r.get("issue", "")
-        nums = [int(x) for x in r.get("numbers", "").split()]
+        nums = parse_kl8_numbers(r.get("numbers", ""))
         if not nums:
             warn(f"期号{issue}无号码")
             continue
