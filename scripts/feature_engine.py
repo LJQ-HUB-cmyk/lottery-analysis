@@ -261,16 +261,18 @@ def add_missing_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_hot_cold(df: pd.DataFrame) -> pd.DataFrame:
-    """冷热分类（含分位）"""
+def add_hot_cold(df: pd.DataFrame, cold_threshold: int = 6) -> pd.DataFrame:
+    """冷热分类（含分位）。
+    cold_threshold: 遗漏超过此值标记为冷（默认6，与 scoring_weights.yaml 一致）。
+    """
     for label, prefix in [('全位', '遗漏'), ('百位', 'miss_bai'), ('十位', 'miss_shi'), ('个位', 'miss_ge')]:
         for d in range(10):
             col_miss = f'{prefix}_{d}'
             col_hc = f'hotcold_{label[:2]}_{d}' if label != '全位' else f'冷热_{d}'
             df[col_hc] = '温'
             df.loc[df[col_miss] <= 3, col_hc] = '热'
-            df.loc[df[col_miss] > 8, col_hc] = '冷'
-    
+            df.loc[df[col_miss] > cold_threshold, col_hc] = '冷'
+
     return df
 
 

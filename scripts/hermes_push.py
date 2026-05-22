@@ -277,7 +277,7 @@ def format_review_section() -> str:
                 output_parts.append(f"- {r['name']}：和值差+跨度差={r['score']}{hit_o_str}")
 
         # 一句话复盘结论
-        sum_comment = "偏低" if total <= 10 else ("偏高" if total >= 20 else "居中")
+        sum_comment = "低" if total <= 9 else ("高" if total >= 18 else "中")
         span_comment = "小" if span <= 3 else ("大" if span >= 7 else "中")
         output_parts.append(
             f"\n复盘结论：\n"
