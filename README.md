@@ -81,7 +81,8 @@ lottery-analysis/
 │       ├── lottery_predict_push.sh  # 预测推送（→ lottery_predict_job.py）
 │       ├── lottery_review_push.sh   # 复盘推送（→ lottery_review_job.py）
 │       ├── kl8_predict_push.sh      # KL8预测推送（→ kl8_predict_job.py）
-│       └── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
+│       ├── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
+│       └── kl8_check_push.sh        # KL8健康检查包装（待启用）
 ├── rules/
 │   ├── scoring_weights.yaml              # 默认权重
 │   ├── scoring_weights_conservative.yaml # 稳健策略
@@ -104,11 +105,11 @@ lottery-analysis/
 │   ├── push/                 # 推送日报 + 发送日志 + pending补发
 │   ├── status/               # 任务状态JSON（运行时产物，git忽略）
 │   └── tuning/               # 调参记录
-├── changelog/                 # 单日详细变更记录
 ├── CLAUDE.md                 # Agent 项目指令
 ├── Makefile                  # 一键命令入口
 ├── PROJECT_REVIEW.md         # 项目审查记录
 ├── CHANGELOG.md              # 集中式变更日志
+├── docs/                     # 项目文档（配置/记录/计划）
 └── requirements.txt          # 依赖清单
 ```
 

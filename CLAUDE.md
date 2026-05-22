@@ -98,7 +98,8 @@ lottery-analysis/
 │       ├── lottery_predict_push.sh  # 预测推送（→ lottery_predict_job.py）
 │       ├── lottery_review_push.sh   # 复盘推送（→ lottery_review_job.py）
 │       ├── kl8_predict_push.sh      # KL8预测推送（→ kl8_predict_job.py）
-│       └── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
+│       ├── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
+│       └── kl8_check_push.sh        # KL8健康检查包装（待启用）
 ├── rules/
 │   ├── scoring_weights.yaml              # 默认权重
 │   ├── scoring_weights_conservative.yaml # 稳健策略

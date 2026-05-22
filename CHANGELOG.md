@@ -1,6 +1,6 @@
 # 变更日志
 
-> 集中式变更日志，按版本从新到旧排列。单日详细记录见 `changelog/` 目录。
+> 集中式变更日志，按版本从新到旧排列。单日详细记录见 `docs/` 目录。
 
 ## v2.15.0 (2026-05-22)
 
@@ -59,7 +59,7 @@
 - **推送链路加固**：Tirith glibc 兼容问题导致 cron 审批中断，4 个推送任务全部改为 no_agent=true
 - **脚本化推送**：新建 `~/.hermes/scripts/lottery_predict_push.sh` / `lottery_review_push.sh`
 - **不消耗 API token**：no_agent 模式无大模型调用，脚本直接运行并 stdout 交付飞书
-- **crontab 方案讨论并否决**：详见 `changelog/2026-05-19-fix-tirith-cron-push.md`
+- **crontab 方案讨论并否决**：详见 `docs/` 目录下相关记录
 
 ## v2.10.0 (2026-05-19)
 
