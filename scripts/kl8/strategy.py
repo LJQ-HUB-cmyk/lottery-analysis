@@ -73,7 +73,8 @@ def v3_missing_rebound(draws: list[list[int]], play_size: int = 4,
 # 策略注册表
 STRATEGIES: dict[str, Callable] = {
     "kl8_v0_random": v0_random,
-    "kl8_v1_hot_cold": v1_hot_cold,
+    "kl8_v1_hot12_cold8": v1_hot_cold,
+    "kl8_v1_hot_cold": v1_hot_cold,       # 兼容旧名
     "kl8_v2_zone_balance": v2_zone_balance,
     "kl8_v3_missing_rebound": v3_missing_rebound,
 }

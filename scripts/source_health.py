@@ -42,9 +42,20 @@ def get_latest_data(lottery):
         df = pd.read_csv(path, dtype=str, encoding='utf-8-sig')
         if len(df) == 0:
             return None
-        # 号码可能在 '号码' 或 '中奖号码' 列
-        num_col = '号码' if '号码' in df.columns else (
-            '中奖号码' if '中奖号码' in df.columns else df.columns[-1])
+
+        # 号码列检测（不用 columns[-1] 兜底，避免取到错误列）
+        num_col = None
+        for candidate in ['号码', '中奖号码']:
+            if candidate in df.columns:
+                num_col = candidate
+                break
+        if num_col is None:
+            return {'error': f'未找到号码列，可用列: {list(df.columns)}'}
+
+        # 确保取最新一期（按期号降序）
+        if '期号' in df.columns:
+            df = df.sort_values('期号', ascending=False)
+
         return {
             'issue': str(df['期号'].iloc[0]),
             'number': str(df[num_col].iloc[0]),

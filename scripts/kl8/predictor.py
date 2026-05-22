@@ -33,9 +33,16 @@ def load_history(n: int = 50) -> list[list[int]]:
 
 
 def next_issue(latest_issue: str) -> str:
+    """计算下一期号，处理年份翻转。
+    期号格式: YYYYNNN（如 2025365 = 2025年第365期）。
+    """
+    import calendar
     try:
         y = int(latest_issue[:4])
         n = int(latest_issue[4:])
+        max_n = 366 if calendar.isleap(y) else 365
+        if n >= max_n:
+            return f"{y + 1}001"
         return f"{y}{n + 1:03d}"
     except (ValueError, IndexError):
         return "unknown"

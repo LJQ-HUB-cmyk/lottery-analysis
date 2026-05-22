@@ -122,7 +122,7 @@ def main():
           f"偶{stats['latest_draw']['odd_even']['even']} "
           f"小{stats['latest_draw']['big_small']['small']}/"
           f"大{stats['latest_draw']['big_small']['big']} "
-          f"连号{stats['latest_draw']['consecutive_pairs']}组 "
+          f"连号{stats['latest_draw']['consecutive_pairs']}对 "
           f"和值{stats['latest_draw']['sum']}")
 
 

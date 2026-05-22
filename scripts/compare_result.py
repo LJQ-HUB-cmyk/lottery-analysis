@@ -42,7 +42,7 @@ def load_prediction(lottery, prediction_path=None, strategy='default', issue=Non
 
     if not path.exists():
         print(f"[错误] 预测文件不存在: {path}")
-        sys.exit(1)
+        sys.exit(2)
 
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -54,7 +54,7 @@ def load_latest_draw(lottery):
     if not path.exists():
         print(f"[错误] 特征数据不存在: {path}")
         print(f"  请先运行: python run_daily.py {lottery}")
-        sys.exit(1)
+        sys.exit(2)
 
     df = pd.read_csv(path, encoding='utf-8-sig')
     latest = df.iloc[0]
@@ -368,7 +368,7 @@ def main():
 
     # 真错误时 exit 1，便于 daily_review 检测失败
     if report.get('错误'):
-        sys.exit(1)
+        sys.exit(2)
 
 
 if __name__ == '__main__':

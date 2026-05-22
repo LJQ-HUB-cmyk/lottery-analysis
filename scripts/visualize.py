@@ -86,6 +86,7 @@ def plot_trend(df: pd.DataFrame, lottery_name: str, output_dir: Path, periods: i
 
 def plot_missing(df: pd.DataFrame, lottery_name: str, output_dir: Path):
     """遗漏柱状图"""
+    df = df.sort_values('期数', ascending=False).reset_index(drop=True)
     latest = df.iloc[0]
     digits = list(range(10))
     miss_values = [int(latest[f'遗漏_{d}']) for d in digits]
@@ -116,6 +117,7 @@ def plot_missing(df: pd.DataFrame, lottery_name: str, output_dir: Path):
 
 def plot_heatmap(df: pd.DataFrame, lottery_name: str, output_dir: Path, periods: int = 100):
     """分位热力图"""
+    df = df.sort_values('期数', ascending=False).reset_index(drop=True)
     df_window = df.head(periods)
     
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
