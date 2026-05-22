@@ -1,32 +1,43 @@
 #!/bin/bash
-# KL8 review push script - designed for hermes cron no_agent=true mode
-# ALWAYS regenerates review before pushing — never cats a stale file.
-# send_log.jsonl + file lock handle dedup.
-# Reviewer exits 0 when waiting for data; we skip push in that case.
+# KL8 review push script - thin wrapper, all business logic in kl8_review_job.py
+# Designed for hermes cron no_agent=true mode.
+set -Eeuo pipefail
 
-set -euo pipefail
+PROJECT_DIR="/home/admin/bendi/lottery-analysis"
+cd "$PROJECT_DIR"
 
-cd /home/admin/bendi/lottery-analysis
-VENV=".venv/bin/python"
+LOG_DIR="logs/push"
+mkdir -p "$LOG_DIR"
 
-echo "[$$] KL8 Step 1/4: 拉取快乐8开奖数据..." >&2
-$VENV scripts/kl8/fetcher.py --pages 3
+TODAY="$(date +%F)"
+LOG_FILE="$LOG_DIR/kl8_review_${TODAY}.log"
 
-echo "[$$] KL8 Step 2/4: 生成快乐8复盘..." >&2
-$VENV scripts/kl8/reviewer.py
-
-# reviewer 在等待开奖时不写 review_latest.json；检测是否真正写入了
-REVIEW_FILE="output/kl8/kl8_review_latest.json"
-if [ ! -f "$REVIEW_FILE" ]; then
-    echo "[$$] KL8 复盘未生成（可能开奖数据未就绪），本轮不推送" >&2
+# 全流程锁，防止重叠执行
+LOCK_FILE="/tmp/kl8_review_push.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "[$(date '+%F %T')] 已有 KL8 复盘任务运行中，本轮跳过" >> "$LOG_FILE"
     exit 0
 fi
 
-echo "[$$] KL8 Step 3/4: 生成快乐8累计表现..." >&2
-$VENV scripts/kl8/metrics.py || true
+if [ ! -x ".venv/bin/python" ]; then
+    echo "[$(date '+%F %T')] .venv/bin/python 不存在" >> "$LOG_FILE"
+    exit 3
+fi
 
-echo "[$$] KL8 Step 4/4: 输出快乐8复盘推送..." >&2
-$VENV scripts/hermes_push.py --mode review --lottery kl8 --stdout
+export PYTHONPATH="$PROJECT_DIR"
 
-echo "[$$] KL8 复盘推送流程完成" >&2
-exit 0
+{
+    echo "========== kl8_review start $(date '+%F %T') =========="
+    echo "PROJECT_DIR=$PROJECT_DIR"
+} >> "$LOG_FILE"
+
+.venv/bin/python scripts/jobs/kl8_review_job.py 2>> "$LOG_FILE"
+EXIT_CODE=$?
+
+{
+    echo "========== kl8_review end $(date '+%F %T'), exit=$EXIT_CODE =========="
+    echo
+} >> "$LOG_FILE"
+
+exit "$EXIT_CODE"

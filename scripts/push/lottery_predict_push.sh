@@ -1,27 +1,35 @@
 #!/bin/bash
-# Lottery predict push script - designed for hermes cron no_agent=true mode
-# ALWAYS regenerates predictions before pushing, even if old data exists.
-# This ensures data is fresh and no cron approval is needed.
+# Lottery predict push script - thin wrapper, all business logic in lottery_predict_job.py
+# Designed for hermes cron no_agent=true mode.
+set -Eeuo pipefail
 
-set -e
+PROJECT_DIR="/home/admin/bendi/lottery-analysis"
+cd "$PROJECT_DIR"
 
-cd /home/admin/bendi/lottery-analysis
+LOG_DIR="logs/push"
+mkdir -p "$LOG_DIR"
 
-VENV=".venv/bin/python"
+TODAY="$(date +%F)"
+LOG_FILE="$LOG_DIR/lottery_predict_${TODAY}.log"
 
-echo "[$$] 开始预测推送流程..." >&2
+if [ ! -x ".venv/bin/python" ]; then
+    echo "[$(date '+%F %T')] .venv/bin/python 不存在" >> "$LOG_FILE"
+    exit 3
+fi
 
-# Step 1: 始终重新生成预测（确保数据是最新的）
-echo "[$$] Step 1/3: 生成今日预测..." >&2
-$VENV run_daily.py --strategy all --top-k 30 2>/dev/null
+export PYTHONPATH="$PROJECT_DIR"
 
-# Step 2: 生成数据源健康报告
-echo "[$$] Step 2/3: 生成数据源健康报告..." >&2
-$VENV scripts/source_health.py --json --output output/reports/source_health.json 2>/dev/null || true
+{
+    echo "========== lottery_predict start $(date '+%F %T') =========="
+    echo "PROJECT_DIR=$PROJECT_DIR"
+} >> "$LOG_FILE"
 
-# Step 3: 生成并输出推送内容（加 --force 避免当天去重击中后无输出）
-echo "[$$] Step 3/3: 生成推送内容..." >&2
-$VENV scripts/hermes_push.py --mode predict --stdout --force 2>/dev/null
+.venv/bin/python scripts/jobs/lottery_predict_job.py 2>> "$LOG_FILE"
+EXIT_CODE=$?
 
-echo "[$$] 预测推送流程完成" >&2
-exit 0
+{
+    echo "========== lottery_predict end $(date '+%F %T'), exit=$EXIT_CODE =========="
+    echo
+} >> "$LOG_FILE"
+
+exit "$EXIT_CODE"

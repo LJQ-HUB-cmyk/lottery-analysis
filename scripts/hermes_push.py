@@ -892,6 +892,27 @@ def already_sent(kind: str, h: str) -> bool:
     return False
 
 
+def already_sent_by_key(kind: str, dedup_key: str) -> bool:
+    """业务键去重：同一 date+kind+dedup_key 只推一次，文本变化不绕过"""
+    log_path = PUSH_DIR / "send_log.jsonl"
+    if not log_path.exists():
+        return False
+    today = today_str()
+    try:
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if (item.get("date") == today
+                    and item.get("kind") == kind
+                    and item.get("dedup_key") == dedup_key
+                    and item.get("ok")):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 _LOCK_DIR = BASE / "output" / ".push_locks"
 _LOCK_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -935,13 +956,14 @@ def release_push_lock(kind: str, h: str):
         pass
 
 
-def append_log(kind: str, h: str, ok: bool, detail: str = ""):
+def append_log(kind: str, h: str, ok: bool, detail: str = "", dedup_key: str = ""):
     log_path = PUSH_DIR / "send_log.jsonl"
     item = {
         "time": now().strftime("%Y-%m-%d %H:%M:%S"),
         "date": today_str(),
         "kind": kind,
         "hash": h,
+        "dedup_key": dedup_key,
         "ok": ok,
         "detail": detail,
     }
@@ -1114,27 +1136,32 @@ def save_push_state(state: dict):
         print(f"[WARN] 写入 push_state 失败: {e}", file=sys.stderr)
 
 
-def send_or_save(text: str, kind: str, force: bool = False, do_send: bool = True) -> int:
+def send_or_save(text: str, kind: str, force: bool = False, do_send: bool = True,
+                 dedup_key: str = "") -> int:
     h = msg_hash(text)
     report_path = PUSH_DIR / f"{kind}_report.md"
     pending_path = PUSH_DIR / f"pending_{kind}_report.md"
 
     # 始终落盘
     if not write_file(report_path, text):
-        append_log(kind, h, False, "write failed")
+        append_log(kind, h, False, "write failed", dedup_key)
         return 3
 
-    # 去重
-    if not force and already_sent(kind, h):
-        print(f"[跳过] 今日已发送相同 {kind} 消息")
-        return 0
+    # 去重：业务键优先，hash 兜底
+    if not force:
+        if dedup_key and already_sent_by_key(kind, dedup_key):
+            print(f"[跳过] 今日已发送相同 {kind} 消息（dedup_key={dedup_key}）")
+            return 0
+        if already_sent(kind, h):
+            print(f"[跳过] 今日已发送相同 {kind} 消息")
+            return 0
 
     if not do_send:
         try:
             print(text)
         except UnicodeEncodeError:
             print(text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
-        append_log(kind, h, True, "write only")
+        append_log(kind, h, True, "write only", dedup_key)
         return 0
 
     # 多通道推送（各通道独立隔离）
@@ -1145,13 +1172,13 @@ def send_or_save(text: str, kind: str, force: bool = False, do_send: bool = True
     if success_count > 0:
         if pending_path.exists():
             pending_path.unlink()
-        append_log(kind, h, True, f"channels: {results}")
+        append_log(kind, h, True, f"channels: {results}", dedup_key)
         print(f"[完成] {kind} 推送: {results}")
         return 0
 
     # 全部通道失败
     write_file(pending_path, text)
-    append_log(kind, h, False, f"all channels failed: {results}")
+    append_log(kind, h, False, f"all channels failed: {results}", dedup_key)
     print(f"[失败] {kind} 全部通道推送失败，已落盘: {pending_path}")
     return 2
 
@@ -1173,10 +1200,36 @@ def main():
                         help="复盘：两彩种都齐全才输出（21:35/22:05用）")
     parser.add_argument("--final-check", action="store_true",
                         help="复盘：未齐输出兜底通知（23:10用）")
+    parser.add_argument("--dedup-key", default="",
+                        help="业务去重键（job 层计算后传入，优先级高于自动计算）")
     args = parser.parse_args()
 
     lottery = args.lottery
     kind = f"{args.mode}_{lottery}" if lottery != "all" else args.mode
+
+    # 计算业务去重键（按期号，不受文本微小变化影响）
+    # --dedup-key 显式传入时优先使用；否则自动从数据文件推断
+    dedup_key = args.dedup_key
+    if not dedup_key and args.mode == "predict":
+        if lottery == "kl8":
+            pred = read_json(KL8_OUTPUT_DIR / "kl8_predict_latest.json")
+            dedup_key = f"kl8_predict:{pred.get('predicted_issue', '?')}"
+        else:
+            pls = read_json(PRED_DIR / "latest_pls.json")
+            d3 = read_json(PRED_DIR / "latest_d3.json")
+            dedup_key = f"predict:{today_str()}:{pls.get('预测期号','?')}:{d3.get('预测期号','?')}"
+    elif not dedup_key and args.mode == "review":
+        if lottery == "kl8":
+            rev = read_json(KL8_OUTPUT_DIR / "kl8_review_latest.json")
+            dedup_key = f"kl8_review:{rev.get('issue', '?')}"
+        else:
+            rows = pick_latest_review(read_review_csv())
+            issues = {}
+            for row in rows:
+                lotto = row.get("彩种", "")
+                issue = "".join(c for c in row.get("期号", "") if c.isdigit())
+                issues[lotto] = issue
+            dedup_key = f"review:{today_str()}:{issues.get('排列三','?')}:{issues.get('福彩3D','?')}"
 
     if args.mode == "predict":
         if lottery == "kl8":
@@ -1211,27 +1264,38 @@ def main():
         report_path = PUSH_DIR / f"{kind}_report.md"
         write_file(report_path, text)
         h = msg_hash(text)
-        # 加锁防止并发重复推送
-        if not args.force and already_sent(kind, h):
-            print(f"[跳过] 今日已推送过相同内容", file=sys.stderr)
-            sys.exit(0)
+        # 去重：业务键优先
+        if not args.force:
+            if dedup_key and already_sent_by_key(kind, dedup_key):
+                print(f"[跳过] 今日已推送过（dedup_key={dedup_key}）", file=sys.stderr)
+                sys.exit(0)
+            if already_sent(kind, h):
+                print(f"[跳过] 今日已推送过相同内容", file=sys.stderr)
+                sys.exit(0)
         if not acquire_push_lock(kind, h, timeout=5.0):
             print(f"[跳过] 推送锁获取失败（可能正在推送中）", file=sys.stderr)
             sys.exit(0)
         try:
             # 再次检查（持有锁后二次确认）
-            if not args.force and already_sent(kind, h):
-                print(f"[跳过] 二次检查已推送过", file=sys.stderr)
-                sys.exit(0)
+            if not args.force:
+                if dedup_key and already_sent_by_key(kind, dedup_key):
+                    print(f"[跳过] 二次检查已推送过（dedup_key={dedup_key}）", file=sys.stderr)
+                    sys.exit(0)
+                if already_sent(kind, h):
+                    print(f"[跳过] 二次检查已推送过", file=sys.stderr)
+                    sys.exit(0)
             # 日志包含内容长度和预览摘要
             preview = text.replace("\n", "\\n")[:60]
-            append_log(kind, h, True, f"hermes deliver=origin | len={len(text)} | preview={preview}")
+            append_log(kind, h, True,
+                       f"hermes deliver=origin | len={len(text)} | preview={preview}",
+                       dedup_key)
             print(text)
         finally:
             release_push_lock(kind, h)
         sys.exit(0)
 
-    code = send_or_save(text, kind=kind, force=args.force, do_send=not args.write_only)
+    code = send_or_save(text, kind=kind, force=args.force, do_send=not args.write_only,
+                        dedup_key=dedup_key)
     sys.exit(code)
 
 

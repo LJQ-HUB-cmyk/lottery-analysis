@@ -1,23 +1,35 @@
 #!/bin/bash
-# KL8 predict push script - designed for hermes cron no_agent=true mode
-# ALWAYS regenerates predictions before pushing — never cats a stale file.
+# KL8 predict push script - thin wrapper, all business logic in kl8_predict_job.py
+# Designed for hermes cron no_agent=true mode.
+set -Eeuo pipefail
 
-set -euo pipefail
+PROJECT_DIR="/home/admin/bendi/lottery-analysis"
+cd "$PROJECT_DIR"
 
-cd /home/admin/bendi/lottery-analysis
-VENV=".venv/bin/python"
+LOG_DIR="logs/push"
+mkdir -p "$LOG_DIR"
 
-echo "[$$] KL8 Step 1/4: 拉取快乐8数据..." >&2
-$VENV scripts/kl8/fetcher.py --pages 3
+TODAY="$(date +%F)"
+LOG_FILE="$LOG_DIR/kl8_predict_${TODAY}.log"
 
-echo "[$$] KL8 Step 2/4: 生成快乐8预测..." >&2
-$VENV scripts/kl8/predictor.py
+if [ ! -x ".venv/bin/python" ]; then
+    echo "[$(date '+%F %T')] .venv/bin/python 不存在" >> "$LOG_FILE"
+    exit 3
+fi
 
-echo "[$$] KL8 Step 3/4: 生成快乐8统计..." >&2
-$VENV scripts/kl8/stats.py || true
+export PYTHONPATH="$PROJECT_DIR"
 
-echo "[$$] KL8 Step 4/4: 输出快乐8预测推送..." >&2
-$VENV scripts/hermes_push.py --mode predict --lottery kl8 --stdout --force
+{
+    echo "========== kl8_predict start $(date '+%F %T') =========="
+    echo "PROJECT_DIR=$PROJECT_DIR"
+} >> "$LOG_FILE"
 
-echo "[$$] KL8 预测推送流程完成" >&2
-exit 0
+.venv/bin/python scripts/jobs/kl8_predict_job.py 2>> "$LOG_FILE"
+EXIT_CODE=$?
+
+{
+    echo "========== kl8_predict end $(date '+%F %T'), exit=$EXIT_CODE =========="
+    echo
+} >> "$LOG_FILE"
+
+exit "$EXIT_CODE"

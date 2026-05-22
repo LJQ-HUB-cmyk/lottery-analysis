@@ -1,39 +1,50 @@
 #!/bin/bash
-# Lottery review push script - designed for hermes cron no_agent=true mode
-# ALWAYS regenerates review before pushing — never cats a stale file.
-# send_log.jsonl + file lock handle dedup across the 3 evening waves.
-# push_state.json is only used by direct webhook mode, not --stdout deliver=origin.
+# Lottery review push script - thin wrapper, all business logic in lottery_review_job.py
+# Designed for hermes cron no_agent=true mode.
+# --stage: normal=两彩种齐全才推送；final=不齐也推送兜底通知
+set -Eeuo pipefail
 
-set -e
+PROJECT_DIR="/home/admin/bendi/lottery-analysis"
+cd "$PROJECT_DIR"
 
-cd /home/admin/bendi/lottery-analysis
-VENV=".venv/bin/python"
-
-# 23:10 的 cron 无法传参（no_agent script 模式），改为自动检测时间
-# 23 点后自动启用 --final-check
-if [ "${1:-}" = "--final" ]; then
-    FINAL_FLAG="--final-check"
-elif [ "$(date +%H)" -ge 23 ]; then
-    FINAL_FLAG="--final-check"
-else
-    FINAL_FLAG="--complete-only"
-fi
-
-LOG_DIR="logs"
-LOG_FILE="$LOG_DIR/review_push_$(date +%F).log"
+LOG_DIR="logs/push"
 mkdir -p "$LOG_DIR"
 
-echo "[$$] $(date) 开始复盘推送 final=$([ "$FINAL_FLAG" = "--final-check" ] && echo yes || echo no)" >> "$LOG_FILE"
+TODAY="$(date +%F)"
+LOG_FILE="$LOG_DIR/lottery_review_${TODAY}.log"
 
-# Step 1: 始终重新跑复盘（拉取开奖 + 对比 + 摘要）
-echo "[$$] Step 1/2: 执行 daily_review..." >> "$LOG_FILE"
-$VENV scripts/daily_review.py >> "$LOG_FILE" 2>&1 || true
+# 全流程锁，防止三波任务重叠执行
+LOCK_FILE="/tmp/lottery_review_push.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "[$(date '+%F %T')] 已有 lottery_review 任务运行中，本轮跳过" >> "$LOG_FILE"
+    exit 0
+fi
 
-# Step 2: 生成复盘推送内容
-#   --complete-only: 两彩种齐全才输出，未齐静默（21:35/22:05）
-#   --final-check: 未齐则输出兜底通知（23:10）
-echo "[$$] Step 2/2: 生成复盘推送内容..." >> "$LOG_FILE"
-$VENV scripts/hermes_push.py --mode review --stdout $FINAL_FLAG 2>> "$LOG_FILE"
+if [ ! -x ".venv/bin/python" ]; then
+    echo "[$(date '+%F %T')] .venv/bin/python 不存在" >> "$LOG_FILE"
+    exit 3
+fi
 
-echo "[$$] $(date) 复盘推送流程完成" >> "$LOG_FILE"
-exit 0
+# 23 点后自动启用 final 阶段
+STAGE="normal"
+if [ "${1:-}" = "--final" ] || [ "$(date +%H)" -ge 23 ]; then
+    STAGE="final"
+fi
+
+export PYTHONPATH="$PROJECT_DIR"
+
+{
+    echo "========== lottery_review start $(date '+%F %T'), stage=$STAGE =========="
+    echo "PROJECT_DIR=$PROJECT_DIR"
+} >> "$LOG_FILE"
+
+.venv/bin/python scripts/jobs/lottery_review_job.py --stage "$STAGE" 2>> "$LOG_FILE"
+EXIT_CODE=$?
+
+{
+    echo "========== lottery_review end $(date '+%F %T'), exit=$EXIT_CODE =========="
+    echo
+} >> "$LOG_FILE"
+
+exit "$EXIT_CODE"

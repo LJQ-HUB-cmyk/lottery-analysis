@@ -56,12 +56,15 @@ def main():
 
     lotteries = ['pls', 'd3'] if not args.lottery else [args.lottery]
 
+    results = {}  # step_name → ok
+
     # 1. 拉取最新开奖数据
-    run(["scripts/data_fetcher.py", "--all"], "拉取最新开奖数据")
+    results["拉取开奖数据"] = run(["scripts/data_fetcher.py", "--all"], "拉取最新开奖数据")
 
     # 2. 特征工程
     for lt in lotteries:
-        run(["scripts/feature_engine.py",
+        results[f"{lt} 特征工程"] = run(
+            ["scripts/feature_engine.py",
              "--input", f"data/raw/{lt}_raw.csv",
              "--output", f"data/processed/{lt}_feat.csv",
              "--lottery", lt, "--force"],
@@ -71,15 +74,26 @@ def main():
     strategies = ['default', 'conservative', 'diversity']
     for lt in lotteries:
         for st in strategies:
-            run(["scripts/compare_result.py", "--lottery", lt, "--strategy", st],
+            results[f"{lt} {st}对比"] = run(
+                ["scripts/compare_result.py", "--lottery", lt, "--strategy", st],
                 f"{lt} {st}策略 对比复盘")
 
     # 4. 复盘摘要
-    run(["scripts/review_summary.py"], "复盘表现摘要")
+    results["复盘摘要"] = run(["scripts/review_summary.py"], "复盘表现摘要")
+
+    # 聚合结果
+    failed = [k for k, v in results.items() if not v]
+    all_ok = len(failed) == 0
 
     print(f"\n{'='*55}")
-    print(f"  ✅ 每日复盘完成")
-    print(f"{'='*55}\n")
+    if all_ok:
+        print(f"  ✅ 每日复盘完成")
+        print(f"{'='*55}\n")
+        sys.exit(0)
+    else:
+        print(f"  ❌ 每日复盘存在失败步骤：{', '.join(failed)}")
+        print(f"{'='*55}\n")
+        sys.exit(2)
 
 
 if __name__ == '__main__':
