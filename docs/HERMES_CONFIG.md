@@ -395,7 +395,72 @@ python scripts/hermes_push.py --mode review --force
    python scripts/hermes_push.py --mode review --force
    ```
 
-### 微信限频
+---
+
+## Python 环境约定
+
+> 本项目正式运行环境统一使用 `.venv/bin/python`，**禁止**直接调用系统 `python` 或 `python3`。
+
+### 执行路径
+
+```
+Hermes cron (no_agent)
+  → scripts/push/*.sh（薄入口 shell 脚本）
+    → .venv/bin/python scripts/jobs/*.py（业务逻辑）
+```
+
+Hermes 配置中的 command 只写 `bash scripts/push/*.sh`，不允许直接写 `python run_daily.py` 或 `python scripts/jobs/*.py`。
+
+### 环境文件
+
+| 目录 | 用途 | 状态 |
+|:-----|:-----|:----:|
+| `.venv/` | 正式 Hermes 运行环境（uv 创建） | ✅ 正式 |
+| `venv/` | 临时测试环境（pip 创建） | ⚠️ 待清理 |
+
+### 新增依赖
+
+`.venv` 由 uv 管理（无普通 pip），服务器 PyPI 官方源可能不可用。新增依赖统一使用：
+
+```bash
+cd /home/admin/bendi/lottery-analysis
+uv pip install --python .venv/bin/python 包名 \
+  --index-url https://mirrors.aliyun.com/pypi/simple/
+```
+
+#### 示例
+
+```bash
+# 安装 packages
+uv pip install --python .venv/bin/python beautifulsoup4 \
+  --index-url https://mirrors.aliyun.com/pypi/simple/
+
+# 检查已安装
+uv pip list --python .venv/bin/python
+```
+
+### 故障恢复（手动执行）
+
+如果 Hermes cron 未触发，需手动补跑时执行：
+
+```bash
+# 预测
+cd /home/admin/bendi/lottery-analysis
+.venv/bin/python scripts/jobs/lottery_predict_job.py
+
+# 复盘
+cd /home/admin/bendi/lottery-analysis
+.venv/bin/python scripts/jobs/lottery_review_job.py
+
+# 强制推送（绕过 dedup）
+.venv/bin/python scripts/hermes_push.py --mode predict --force
+
+# KL8
+.venv/bin/python scripts/jobs/kl8_predict_job.py
+.venv/bin/python scripts/jobs/kl8_review_job.py
+```
+
+**禁止**用系统 `python` 执行——系统环境无依赖，会报 `ModuleNotFoundError`。
 
 `hermes_push.py` 已内置冷却和退避。如果仍然限频：
 - 改用飞书作为主通道（配置 `FEISHU_WEBHOOK_URL`）

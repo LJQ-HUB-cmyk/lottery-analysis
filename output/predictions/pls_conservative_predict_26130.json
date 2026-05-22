@@ -2,7 +2,7 @@
   "彩种": "排列三",
   "数据截至期号": 26129,
   "预测期号": 26130,
-  "评分时间": "2026-05-20 18:38:30",
+  "评分时间": "2026-05-20 14:49:59",
   "top_k": 30,
   "风险提示": "⚠️ 彩票开奖具有高度随机性，本评分仅基于历史统计和理论分布，不代表未来开奖结果。请理性看待，量力而行。",
   "摘要": {
@@ -79,10 +79,10 @@
   },
   "生成信息": {
     "命令": "python scripts/scoring_engine.py --lottery pls --top-k 30 --exclude-recent 5 --exclude-mode direct",
-    "权重文件": "rules\\scoring_weights_conservative.yaml",
-    "统计缓存": "data\\cache\\pls_stats_latest.json",
-    "数据文件": "data\\processed\\pls_feat.csv",
-    "代码版本": "2244ede"
+    "权重文件": "rules/scoring_weights_conservative.yaml",
+    "统计缓存": "data/cache/pls_stats_latest.json",
+    "数据文件": "data/processed/pls_feat.csv",
+    "代码版本": "dafd3ef"
   },
   "权重": {
     "和值": 20,

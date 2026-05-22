@@ -172,8 +172,9 @@
    - `pip install` 对 `https://pypi.org` 超时（连接到超时）
    - `https://mirrors.aliyun.com/pypi/simple/` 正常（200，~200KB/s）
    - 已创建项目 venv 并安装完整依赖
-   - **cron job 必须用 `venv/bin/python`**
-   - **建议**：在 README 或 CLAUDE.md 中注明镜像源
+   - **正式环境统一走 `.venv/bin/python`**（push 脚本已指向），不碰系统 Python
+   - 新增依赖用 `uv + 阿里云镜像`，详见 `docs/HERMES_CONFIG.md` → "Python 环境约定"
+   - `venv/` 为临时测试环境，稳定后删除
 
 ---
 
