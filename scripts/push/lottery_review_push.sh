@@ -39,8 +39,10 @@ export PYTHONPATH="$PROJECT_DIR"
     echo "PROJECT_DIR=$PROJECT_DIR"
 } >> "$LOG_FILE"
 
+set +e
 .venv/bin/python scripts/jobs/lottery_review_job.py --stage "$STAGE" 2>> "$LOG_FILE"
 EXIT_CODE=$?
+set -e
 
 {
     echo "========== lottery_review end $(date '+%F %T'), exit=$EXIT_CODE =========="

@@ -38,7 +38,7 @@ def now() -> datetime:
 
 def run(cmd: list[str], desc: str, timeout: int = 300) -> bool:
     """执行子进程。返回 True=成功。"""
-    print(f"  [{desc}] 执行中...")
+    print(f"  [{desc}] 执行中...", file=sys.stderr)
     result = subprocess.run(
         [PY] + cmd,
         cwd=str(BASE),
@@ -48,9 +48,9 @@ def run(cmd: list[str], desc: str, timeout: int = 300) -> bool:
     )
     output = result.stdout.decode("utf-8", errors="replace")
     for line in output.strip().split("\n")[-8:]:
-        print(f"    {line}")
+        print(f"    {line}", file=sys.stderr)
     ok = result.returncode == 0
-    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})")
+    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})", file=sys.stderr)
     return ok
 
 
@@ -73,25 +73,25 @@ def main():
         # ── Step 1: 拉取最新开奖 ──
         ok_fetch = run(["scripts/kl8/fetcher.py", "--pages", "3"], "KL8 拉取开奖数据")
         if not ok_fetch:
-            print("[WARN] KL8 fetcher 返回非零，继续尝试复盘...")
+            print("[WARN] KL8 fetcher 返回非零，继续尝试复盘...", file=sys.stderr)
 
         # ── Step 2: 删旧文件 + 记时间戳 ──
         if REVIEW_FILE.exists():
             REVIEW_FILE.unlink()
-            print(f"  已删除旧复盘文件: {REVIEW_FILE}")
+            print(f"  已删除旧复盘文件: {REVIEW_FILE}", file=sys.stderr)
         start_ts = time.time()
 
         # ── Step 3: 执行 reviewer ──
         ok_review = run(["scripts/kl8/reviewer.py"], "KL8 生成复盘")
         if not ok_review:
-            print("[WARN] KL8 reviewer 返回非零")
+            print("[WARN] KL8 reviewer 返回非零", file=sys.stderr)
 
         # ── Step 4: 文件存在 + 时间戳校验 ──
         if not REVIEW_FILE.exists():
             status["status"] = SKIPPED_WAITING
             status["should_push"] = False
             status["reason"] = "复盘文件未生成（开奖数据可能未就绪）"
-            print(f"[SKIP] {status['reason']}")
+            print(f"[SKIP] {status['reason']}", file=sys.stderr)
             write("kl8_review", status)
             sys.exit(0)
 
@@ -100,7 +100,7 @@ def main():
             status["status"] = SKIPPED_WAITING
             status["should_push"] = False
             status["reason"] = f"复盘文件非本轮生成（file_ts={file_ts:.0f} < start_ts={start_ts:.0f}）"
-            print(f"[SKIP] {status['reason']}")
+            print(f"[SKIP] {status['reason']}", file=sys.stderr)
             write("kl8_review", status)
             sys.exit(0)
 
@@ -111,7 +111,7 @@ def main():
             status["status"] = ERROR
             status["ok"] = False
             status["reason"] = f"复盘 JSON 解析失败: {e}"
-            print(f"[ERROR] {status['reason']}")
+            print(f"[ERROR] {status['reason']}", file=sys.stderr)
             write("kl8_review", status)
             sys.exit(2)
 
@@ -128,7 +128,7 @@ def main():
             status["status"] = ERROR
             status["ok"] = False
             status["reason"] = "复盘 JSON 中 issue 为空"
-            print(f"[ERROR] {status['reason']}")
+            print(f"[ERROR] {status['reason']}", file=sys.stderr)
             write("kl8_review", status)
             sys.exit(2)
 
@@ -137,7 +137,7 @@ def main():
             status["status"] = SKIPPED_WAITING
             status["should_push"] = False
             status["reason"] = f"复盘期号 {review_issue} ≠ 预测期号 {target_issue}，等待新数据"
-            print(f"[SKIP] {status['reason']}")
+            print(f"[SKIP] {status['reason']}", file=sys.stderr)
             write("kl8_review", status)
             sys.exit(0)
 
@@ -171,7 +171,7 @@ def main():
 
         stdout_text = result.stdout.decode("utf-8", errors="replace")
         if stdout_text.strip():
-            print(stdout_text)
+            print(stdout_text)  # 推送正文 → stdout
 
         if "[跳过]" in stderr_output and "已推送过" in stderr_output:
             status["status"] = SKIPPED_ALREADY_SENT

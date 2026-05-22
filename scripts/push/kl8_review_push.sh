@@ -32,8 +32,10 @@ export PYTHONPATH="$PROJECT_DIR"
     echo "PROJECT_DIR=$PROJECT_DIR"
 } >> "$LOG_FILE"
 
+set +e
 .venv/bin/python scripts/jobs/kl8_review_job.py 2>> "$LOG_FILE"
 EXIT_CODE=$?
+set -e
 
 {
     echo "========== kl8_review end $(date '+%F %T'), exit=$EXIT_CODE =========="

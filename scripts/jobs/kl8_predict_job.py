@@ -30,7 +30,7 @@ def now() -> datetime:
 
 
 def run(cmd: list[str], desc: str, timeout: int = 300) -> bool:
-    print(f"  [{desc}] 执行中...")
+    print(f"  [{desc}] 执行中...", file=sys.stderr)
     result = subprocess.run(
         [PY] + cmd,
         cwd=str(BASE),
@@ -41,9 +41,9 @@ def run(cmd: list[str], desc: str, timeout: int = 300) -> bool:
     output = result.stdout.decode("utf-8", errors="replace")
     for line in output.strip().split("\n")[-6:]:
         if line.strip():
-            print(f"    {line.strip()}")
+            print(f"    {line.strip()}", file=sys.stderr)
     ok = result.returncode == 0
-    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})")
+    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})", file=sys.stderr)
     return ok
 
 

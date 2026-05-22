@@ -42,6 +42,20 @@ python scripts/backtest.py --lottery pls --periods 100 --top-k 30
 python scripts/backtest.py --lottery d3 --periods 100 --top-k 30
 ```
 
+## 正式运行入口
+
+> 以下为 Hermes cron 使用的正式入口。cron 只跑 shell，shell 只跑 Job，Job 负责全部业务逻辑。
+
+| 入口 | 用途 | 调用链 |
+|------|------|--------|
+| `bash scripts/push/lottery_predict_push.sh` | PLS/D3 预测 | → `lottery_predict_job.py` → run_daily + source_health + hermes_push |
+| `bash scripts/push/lottery_review_push.sh [--final]` | PLS/D3 复盘 | → `lottery_review_job.py --stage normal\|final` → daily_review + hermes_push |
+| `bash scripts/push/kl8_predict_push.sh` | KL8 预测 | → `kl8_predict_job.py` → fetcher + predictor + stats + hermes_push |
+| `bash scripts/push/kl8_review_push.sh` | KL8 复盘 | → `kl8_review_job.py` → fetcher + reviewer + metrics + hermes_push |
+
+> `run_daily.py` / `daily_review.py` / `scripts/hermes_push.py` 不直接配入 cron。
+> 它们只被 Job 调用，或手动调试使用。
+
 ## 项目结构
 
 ```

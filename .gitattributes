@@ -1,11 +1,12 @@
-# 所有Python文件使用LF换行符
+# Force LF line endings for all text files
+# Prevents CRLF/CR corruption on mixed OS development
 *.py text eol=lf
-
-# 数据文件不进行换行符转换（GitHub上查看保留原始格式）
-*.csv -text
-
-# YAML/JSON/MD使用LF
-*.yaml text eol=lf
-*.yml text eol=lf
-*.json text eol=lf
+*.sh text eol=lf
 *.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf

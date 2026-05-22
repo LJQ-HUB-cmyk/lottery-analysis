@@ -45,7 +45,7 @@ def today_str() -> str:
 
 def run(cmd: list[str], desc: str, timeout: int = 300) -> tuple[bool, str]:
     """执行子进程。返回 (ok, stderr_text)。"""
-    print(f"  [{desc}] 执行中...")
+    print(f"  [{desc}] 执行中...", file=sys.stderr)
     result = subprocess.run(
         [PY] + cmd,
         cwd=str(BASE),
@@ -58,9 +58,9 @@ def run(cmd: list[str], desc: str, timeout: int = 300) -> tuple[bool, str]:
     combined = (stderr_text + stdout_text)[-2000:]
     for line in combined.strip().split("\n")[-6:]:
         if line.strip():
-            print(f"    {line.strip()}")
+            print(f"    {line.strip()}", file=sys.stderr)
     ok = result.returncode == 0
-    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})")
+    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})", file=sys.stderr)
     return ok, combined
 
 
@@ -149,29 +149,24 @@ def main():
                 status["status"] = SKIPPED_WAITING
                 status["should_push"] = False
                 status["reason"] = f"开奖未齐: {missing_str}"
-                print(f"[SKIP] {status['reason']}")
+                print(f"[SKIP] {status['reason']}", file=sys.stderr)
                 write("lottery_review", status)
                 sys.exit(0)
 
-            # final 阶段：生成兜底通知
+            # final 阶段：调用 hermes_push --final-check 输出兜底通知
             status["dedup_key"] = f"review_missing:{today_str()}"
             status["should_push"] = True
             status["status"] = READY
             status["reason"] = f"开奖未齐({missing_str})，输出兜底通知"
+            status["issues"] = {}
             status["finished_at"] = now().strftime("%Y-%m-%dT%H:%M:%S%z")
             write("lottery_review", status)
 
-            fallback_text = (
-                f"⚠️ 无法完成复盘\n\n"
-                f"日期：{today_str()}\n"
-                f"原因：{missing_str}\n\n"
-                f"请检查数据源是否正常更新。"
-            )
-
-            # 直接输出兜底文本（绕过 hermes_push 的去重检查在 job 层由 dedup_key 控制）
+            # --final-check：hermes_push 检测数据未齐时自动生成兜底通知
+            # dedup_key 确保同一日期只推一次，不加 --force
             result = subprocess.run(
                 [PY, "scripts/hermes_push.py", "--mode", "review",
-                 "--dedup-key", status["dedup_key"], "--stdout", "--force"],
+                 "--dedup-key", status["dedup_key"], "--final-check", "--stdout"],
                 cwd=str(BASE),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -196,7 +191,7 @@ def main():
             status["status"] = ERROR
             status["ok"] = False
             status["reason"] = "daily_review.py 执行异常"
-            print(f"[ERROR] {status['reason']}")
+            print(f"[ERROR] {status['reason']}", file=sys.stderr)
             write("lottery_review", status)
             sys.exit(2)
 
