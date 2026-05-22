@@ -711,14 +711,20 @@ def build_review_message() -> str:
             if not item:
                 continue
 
-            # 按期号读对应预测文件，fallback latest
+            # 按期号读对应预测文件，fallback latest 需校验期号
             issue_digits = "".join(c for c in review_issue if c.isdigit())
             prefix = f"{lottery_key}_{st_key}" if st_key != "default" else lottery_key
             issue_pred_path = PRED_DIR / f"{prefix}_predict_{issue_digits}.json"
             if issue_pred_path.exists():
                 st_data = read_json(issue_pred_path)
             else:
+                # fallback 到 latest，但必须期号匹配，否则跳过策略详情
                 st_data = read_json(PRED_DIR / f"latest_{prefix}.json")
+                if st_data:
+                    pred_issue = str(st_data.get("预测期号", ""))
+                    actual_issue = "".join(c for c in pred_issue if c.isdigit())
+                    if actual_issue != issue_digits:
+                        st_data = {}  # 期号不匹配，不展示该策略详情
             top10 = extract_top10(st_data) if st_data else []
             top5_str = " ".join(top10[:5]) if top10 else "-"
 

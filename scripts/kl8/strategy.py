@@ -23,11 +23,11 @@ def v1_hot_cold(draws: list[list[int]], pool: list[int] = None,
                 recent5[n] += 1
     if recent5:
         return [n for n, _ in recent5.most_common(play_size)]
-    return sorted(random.sample(list(target_pool), play_size))
+    return sorted(random.sample(list(target_pool), min(play_size, len(target_pool))))
 
 
 def v2_zone_balance(draws: list[list[int]], play_size: int = 4) -> list[int]:
-    """分区均衡：四个分区各选1个近期活跃号码"""
+    """分区均衡：四个分区轮流向候选池各选1个近期活跃号码，直到达到 play_size"""
     if not draws:
         return v0_random(play_size)
     recent5 = Counter()
@@ -35,15 +35,18 @@ def v2_zone_balance(draws: list[list[int]], play_size: int = 4) -> list[int]:
         recent5.update(nums)
     zones = [(1, 20), (21, 40), (41, 60), (61, 80)]
     result = []
+    # 按分区轮询取号，每轮各分区各取1个，直到满足 play_size
+    per_zone = max(1, (play_size + 3) // 4)  # ceil(play_size / 4)
     for lo, hi in zones:
         candidates = [(n, recent5.get(n, 0)) for n in range(lo, hi + 1)]
         candidates.sort(key=lambda x: -x[1])
-        # 选该分区近5期最活跃的号码
+        taken = 0
         for n, _ in candidates:
             if n not in result:
                 result.append(n)
-                break
-    # 恰好4个分区各1个 = 4个号
+                taken += 1
+                if taken >= per_zone:
+                    break
     return sorted(result[:play_size])
 
 

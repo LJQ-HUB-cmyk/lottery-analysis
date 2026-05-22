@@ -261,9 +261,8 @@ def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
             '总投入': f"{total_cost:.0f}元",
             '总回报': f"{total_prize:.0f}元",
             'ROI': f"{roi:.1f}%",
-            '直选ROI': f"${direct_roi:.1f}%",
-            '组选ROI': f"${group_roi:.1f}%",
-            'ROI': f"${roi:.1f}%",
+            '直选ROI': f"{direct_roi:.1f}%",
+            '组选ROI': f"{group_roi:.1f}%",
             '最大连续未中': s['max_miss_streak'],
         }
     

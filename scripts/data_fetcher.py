@@ -28,7 +28,6 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-import yaml
 
 try:
     from issue_utils import validate_issue
@@ -68,22 +67,6 @@ HEADERS = {
                   'AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/134.0.0.0 Safari/537.36',
 }
-
-
-def load_source_config():
-    """从 rules/data_sources.yaml 加载数据源配置"""
-    config_path = BASE_DIR / 'rules' / 'data_sources.yaml'
-    if config_path.exists():
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f) or {}
-    return {}
-
-
-def get_source_urls(lottery, role='primary'):
-    """获取指定彩种的数据源 URL 列表"""
-    cfg = load_source_config()
-    sources = cfg.get(lottery, {}).get(role, [])
-    return [s for s in sources if s.get('enabled', True)]
 
 
 # ==========================================

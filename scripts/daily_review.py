@@ -75,10 +75,21 @@ def main():
              "--lottery", lt, "--force"],
             f"{lt} 特征工程")
 
-    # 3. 三策略对比复盘
-    strategies = ['default', 'conservative', 'diversity']
+    # 3. 策略对比复盘（动态发现可用策略，避免单策略运行时失败）
+    PRED_DIR = BASE / "output" / "predictions"
     for lt in lotteries:
-        for st in strategies:
+        prefix_map = {'pls': 'pls', 'd3': 'd3'}
+        lt_prefix = prefix_map.get(lt, lt)
+        available = []
+        for st in ['default', 'conservative', 'diversity']:
+            suffix = "" if st == "default" else f"_{st}"
+            pred_file = PRED_DIR / f"latest_{lt_prefix}{suffix}.json"
+            if pred_file.exists():
+                available.append(st)
+        if not available:
+            print(f"  [WARN] {lt} 无可用预测文件，跳过对比", file=sys.stderr)
+            continue
+        for st in available:
             results[f"{lt} {st}对比"] = run(
                 ["scripts/compare_result.py", "--lottery", lt, "--strategy", st],
                 f"{lt} {st}策略 对比复盘")
