@@ -16,6 +16,7 @@
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -38,10 +39,14 @@ def run_cmd(cmd, desc, timeout=300):
     logger.info(f"▶️  {desc}")
     logger.debug(f"   $ {' '.join(cmd)}")
     try:
+        env = os.environ.copy()
+        env.setdefault("PYTHONUTF8", "1")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
         result = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=timeout, cwd=str(BASE),
             text=True, encoding='utf-8', errors='replace',
+            env=env,
         )
         if result.returncode == 0:
             logger.info(f"✅ {desc}")

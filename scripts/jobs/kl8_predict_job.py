@@ -11,6 +11,7 @@
 """
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -31,19 +32,23 @@ def now() -> datetime:
 
 def run(cmd: list[str], desc: str, timeout: int = 300) -> bool:
     print(f"  [{desc}] 执行中...", file=sys.stderr)
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     result = subprocess.run(
         [PY] + cmd,
         cwd=str(BASE),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         timeout=timeout,
+        env=env,
     )
     output = result.stdout.decode("utf-8", errors="replace")
     for line in output.strip().split("\n")[-6:]:
         if line.strip():
             print(f"    {line.strip()}", file=sys.stderr)
     ok = result.returncode == 0
-    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'} (exit={result.returncode})", file=sys.stderr)
+    print(f"  -> {'[OK] 成功' if ok else '[WARN] 失败'} (exit={result.returncode})", file=sys.stderr)
     return ok
 
 

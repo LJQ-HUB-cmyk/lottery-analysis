@@ -13,6 +13,7 @@ Hermes cron 配置：
     命令: python scripts/daily_review.py
 """
 
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -26,19 +27,23 @@ def run(cmd, desc):
     print(f"\n{'─'*55}")
     print(f"  {desc}")
     print(f"{'─'*55}")
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     result = subprocess.run(
         [PY] + cmd,
         cwd=str(BASE),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         timeout=300,
+        env=env,
     )
     output = result.stdout.decode('utf-8', errors='replace')
     # 只打印最后几行
     for line in output.strip().split('\n')[-5:]:
         print(f"  {line}")
     ok = result.returncode == 0
-    print(f"  → {'✅ 成功' if ok else '⚠️ 失败'}")
+    print(f"  -> {'[OK] 成功' if ok else '[WARN] 失败'}")
     return ok
 
 
@@ -87,11 +92,11 @@ def main():
 
     print(f"\n{'='*55}")
     if all_ok:
-        print(f"  ✅ 每日复盘完成")
+        print(f"  [OK] 每日复盘完成")
         print(f"{'='*55}\n")
         sys.exit(0)
     else:
-        print(f"  ❌ 每日复盘存在失败步骤：{', '.join(failed)}")
+        print(f"  [ERR] 每日复盘存在失败步骤：{', '.join(failed)}")
         print(f"{'='*55}\n")
         sys.exit(2)
 
