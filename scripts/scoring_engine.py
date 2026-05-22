@@ -139,7 +139,7 @@ def score_number(row, stats, theory, weights, params):
     elif sum_freq_5.get(s_val, 0) >= 2:
         decay = P['overheat_medium']
 
-    sum_score = int((theory_score * 0.5 + recent_score * 0.5) * decay)
+    sum_score = int((theory_score * 0.6 + recent_score * 0.4) * decay)
     details['和值'] = (sum_score, f"和值={s_val}")
     total += sum_score
 
@@ -166,7 +166,7 @@ def score_number(row, stats, theory, weights, params):
     elif span_freq_5.get(span_val, 0) >= 2:
         decay_s = P['overheat_medium']
 
-    span_score = int((theory_score_s * 0.5 + recent_score_s * 0.5) * decay_s)
+    span_score = int((theory_score_s * 0.6 + recent_score_s * 0.4) * decay_s)
     details['跨度'] = (span_score, f"跨度={span_val}")
     total += span_score
 
@@ -185,7 +185,9 @@ def score_number(row, stats, theory, weights, params):
         ratio = 1.0 + (theory_pct - actual_pct) / theory_pct
         ratio = max(0.2, min(1.8, ratio))
         morph_score = int(W['形态'] * ratio)
-    morph_score = min(morph_score, W['形态'])
+    # 允许过冷形态获得适度加分，最多 1.25 倍基准权重（避免形态维度单边惩罚）
+    morph_cap = int(W['形态'] * 1.25)
+    morph_score = max(1, min(morph_score, morph_cap))
     details['形态'] = (morph_score, f"形态={morph}")
     total += morph_score
 
@@ -389,8 +391,11 @@ def generate_predictions(all_df, stats, theory, weights, params,
     # 校验：group_number 必须是号码的数字排序结果
     for c in scored:
         expected_group = ''.join(sorted(c['号码']))
-        assert expected_group == c['group_number'], \
-            f"group_number 不一致: 号码={c['号码']}, group_number={c['group_number']}, 期望={expected_group}"
+        if expected_group != c["group_number"]:
+            raise ValueError(
+                f"group_number 不一致: 号码={c['号码']}, "
+                f"group_number={c['group_number']}, 期望={expected_group}"
+            )
 
     # 多样性调整
     scored = apply_diversity(scored, weights, params)
