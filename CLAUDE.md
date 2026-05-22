@@ -10,20 +10,18 @@
 
 项目通过 Hermes 定时执行，不依赖 GitHub Actions。所有推送类任务（14:40 / 21:35 / 22:05 / 23:10）均为 **no_agent 模式**，绕过 Tirith 安全审批链，不消耗 API token。
 
-### 下午预测链路（14:30 → 14:35 → 14:40）
+### 下午预测链路（14:40 单一入口）
 
-> 两段式推送：下午推送预测 + 晚间推送复盘，详见 [docs/HERMES_CONFIG.md](docs/HERMES_CONFIG.md)
+> 下午推送预测 + 晚间推送复盘，详见 [docs/HERMES_CONFIG.md](docs/HERMES_CONFIG.md)
 > 
-> ⚠️ 14:30 和 14:35 为辅助预生成。即使失败，14:40 的 `lottery_predict_push.sh` 会自动补跑全流程再推送。
+> 14:40 的 `lottery_predict_push.sh` 为自闭环，内部 Job 自动执行 run_daily + source_health + hermes_push。
 
 | 时间 | 命令 | 说明 | 模式 | 审批 |
 |------|------|------|:----:|:----:|
-| 14:30 | `python run_daily.py --strategy all --top-k 30` | 预生成预测（辅助） | agent | ⚠️ 有 |
-| 14:35 | `python scripts/source_health.py --json --output output/reports/source_health.json` | 健康报告（辅助） | agent | ⚠️ 有 |
-| 14:40 | `scripts/push/lottery_predict_push.sh`（自闭环） | **run_daily + source_health + hermes_push** | **no_agent** | **✅ 无** |
+| 14:40 | `scripts/push/lottery_predict_push.sh`（自闭环） | **Job → run_daily + source_health + hermes_push** | **no_agent** | **✅ 无** |
 
 > `lottery_predict_push.sh` 内部：lottery_predict_job.py → run_daily → source_health → hermes_push --mode predict --stdout。
-> 业务键（dedup_key）去重，不加 --force。
+> 业务键（dedup_key）去重，不加 --force。不再需要 14:30/14:35 辅助任务。
 
 ### 晚间复盘链路（21:35 / 22:05 / 23:10 三波补偿）
 

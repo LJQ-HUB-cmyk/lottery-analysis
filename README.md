@@ -283,9 +283,7 @@ python run_daily.py pls --top-k 20 --exclude-recent 3
 
 | 时间 | 操作 | 模式 | 说明 |
 |:---|:-----|:----:|:-----|
-| 14:30 | `python run_daily.py --strategy all --top-k 30` | agent（辅助） | 预生成预测（失败不影响后续） |
-| 14:35 | `python scripts/source_health.py --json` | agent（辅助） | 健康报告（失败不影响后续） |
-| 14:40 | **自动：** `scripts/push/lottery_predict_push.sh` | **no_agent** ✅ | 自闭环：lottery_predict_job.py → run_daily → source_health → 推送预测 |
+| 14:40 | **自动：** `scripts/push/lottery_predict_push.sh` | **no_agent** ✅ | 自闭环：Job → run_daily + source_health + 推送预测 |
 | 14:50 | **自动：** `scripts/push/kl8_predict_push.sh` | **no_agent** ✅ | KL8预测：kl8_predict_job.py → fetcher → predictor → 推送 |
 | 21:35 | **自动：** `scripts/push/lottery_review_push.sh`（--stage normal） | **no_agent** ✅ | 复盘第1波：两彩种齐全才推送 |
 | 22:05 | **自动：** 同上（dedup_key自动去重） | **no_agent** ✅ | 复盘第2波 |

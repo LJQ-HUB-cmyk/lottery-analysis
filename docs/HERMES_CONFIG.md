@@ -23,38 +23,24 @@ FEISHU_WEBHOOK_URL = （你的飞书机器人 webhook 地址）
 cron_mode = allow
 ```
 
-### 三、定时任务（9 个任务）
+### 三、定时任务（7 个任务）
 
-> 所有推送类任务均使用 `~/.hermes/scripts/` 下的软链接指向 `scripts/push/`，项目更新脚本后自动生效
-> 14:30 和 14:35 为辅助预生成，即使失败也不影响 14:40 推送
-> 14:40/14:50/21:35/22:05/22:15/23:10 推送任务均为 no_agent=true 模式，绕过安全审批链
-> 晚间复盘脚本在 23 点后自动启用 --final-check 兜底（无需传参）
-> KL8 复盘错开到 22:15 避免与 PLS/D3 同时跑
+> 所有推送类任务均为 no_agent=true 模式，绕过安全审批链。
+> Shell 脚本为薄入口，调用 Python job 负责业务逻辑。
+> 晚间复盘脚本在 23 点后自动启用 --final-check 兜底（无需传参）。
+> KL8 复盘错开到 22:15 避免与 PLS/D3 同时跑。
+> 修改项目 `scripts/push/` 后须手动 `cp` 到 `~/.hermes/scripts/`（软链接被 Hermes 拦截）。
 
 ```
-# ── 下午预测链路（14:30 → 14:35 → 14:40）──
-
-[task-predict-generate]
-cron = 30 14 * * *
-command = cd /home/admin/bendi/lottery-analysis && python run_daily.py --strategy all --top-k 30
-on_failure = continue
-deliver = local
-description = 预生成预测（辅助，失败不影响14:40推送）
-
-[task-predict-health]
-cron = 35 14 * * *
-command = cd /home/admin/bendi/lottery-analysis && python scripts/source_health.py --json --output output/reports/source_health.json
-on_failure = continue
-deliver = local
-description = 生成数据源健康报告
+# ── 下午预测链路（14:40 单一入口）──
 
 [task-predict-push]
 cron = 40 14 * * *
 command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_predict_push.sh
-on_failure = stop
+on_failure = continue
 deliver = origin
 no_agent = true
-description = 自闭环预测推送：重新跑run_daily→source_health→hermes_push --force
+description = 排列三/福彩3D：下午预测生成并推送（自闭环：Job → run_daily → source_health → hermes_push）
 
 # ── 晚间复盘链路（21:35 / 22:05 / 23:10 三波补偿）──
 
@@ -135,12 +121,11 @@ Hermes 执行环境需配置以下变量：
 ## 两段式推送设计
 
 ```
-下午（14:30 ~ 14:40）：预测推送
-  ├── 14:30 run_daily → 抓数据 + 特征 + 统计 + 三策略评分（辅助预生成）
-  ├── 14:35 source_health → 健康报告（辅助）
-  └── 14:40 lottery_predict_push.sh（自闭环）
-      └── lottery_predict_job.py → run_daily + source_health + hermes_push
-          └── dedup_key = predict:{date}:pls-{issue}:d3-{issue}
+下午（14:40）：预测推送
+  └── lottery_predict_push.sh → lottery_predict_job.py（自闭环）
+      ├── run_daily --strategy all --top-k 30
+      ├── source_health
+      └── hermes_push --mode predict --dedup-key predict:{date}:pls-{issue}:d3-{issue}
 
 晚上（21:35 / 22:05 / 23:10）：复盘推送
   └── lottery_review_push.sh --stage normal|final
@@ -178,35 +163,22 @@ output/status/*.json     → 每次任务的状态记录
 
 ## 定时任务清单
 
-### 下午预测链路（14:30 → 14:40）
+### 下午预测链路（14:40 单一入口）
 
-#### 任务 1 — 14:30 生成今日预测
-
-```
-时间: 14:30
-命令: cd /home/admin/bendi/lottery-analysis && .venv/bin/python run_daily.py --strategy all --top-k 30
-失败处理: 允许失败（辅助任务，失败不影响14:40自闭环推送）
-说明: 数据抓取 → 特征工程 → 统计 → 三策略评分
-      生成 latest_*.json 和按期号归档的 *_predict_{issue}.json
-```
-
-#### 任务 2 — 14:35 健康报告
-
-```
-时间: 14:35
-命令: python scripts/source_health.py --json --output output/reports/source_health.json
-失败处理: 允许失败
-说明: 预测推送可以不带健康状态，失败不阻塞
-```
-
-#### 任务 3 — 14:40 推送预测
+#### 任务 1 — 14:40 预测生成并推送
 
 ```
 时间: 14:40
-命令: python scripts/hermes_push.py --mode predict --stdout
-失败处理: 必须成功
-deliver: origin  ← 关键！
-说明: 只读取预测 JSON，生成"今日预测"推送。不读 review_history，不做期号比较。
+命令: cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_predict_push.sh
+失败处理: 允许失败
+deliver: origin
+no_agent: true
+说明: 自闭环 → lottery_predict_job.py 内部执行：
+  1. run_daily.py --strategy all --top-k 30（数据抓取+特征+统计+三策略评分）
+  2. source_health.py（健康报告）
+  3. hermes_push.py --mode predict --dedup-key ...（推送）
+  4. 写 output/status/lottery_predict_status.json
+  dedup_key = predict:{date}:pls-{issue}:d3-{issue}
 ```
 
 ---
