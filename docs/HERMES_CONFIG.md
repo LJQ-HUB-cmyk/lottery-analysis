@@ -186,37 +186,37 @@ no_agent: true
 ### 晚间复盘链路（21:35 / 22:05 / 23:10）
 
 > 三段式补偿：数据源通常在 21:00 开奖后 20-30 分钟更新，三波覆盖延迟场景。
-> 每波都跑 `daily_review.py && hermes_push.py --mode review`。
-> **防重复**：`send_log.jsonl` + 文件锁 记录每期推送状态，同一期只推送一次。
+> Shell 薄入口 → Python job 编排：`lottery_review_push.sh` → `lottery_review_job.py`（内部：daily_review + 开奖齐全判断 + hermes_push）
+> **防重复**：dedup_key 业务键去重 + flock 全流程锁，同一期只推送一次。
 
 #### 任务 4 — 21:35 复盘尝试
 
 ```
 时间: 21:35
-命令: bash scripts/push/lottery_review_push.sh（内部 --complete-only）
+命令: bash scripts/push/lottery_review_push.sh
 失败处理: 允许失败
 deliver: origin
-说明: 开奖后 35 分钟，两彩种齐全才推送复盘，未齐静默等待下一波
+说明: 开奖后 35 分钟。lottery_review_job.py --stage normal：两彩种齐全才调 hermes_push，未齐写 skipped_waiting 状态并 exit 0
 ```
 
 #### 任务 5 — 22:05 复盘尝试
 
 ```
 时间: 22:05
-命令: bash scripts/push/lottery_review_push.sh（内部 --complete-only）
+命令: bash scripts/push/lottery_review_push.sh
 失败处理: 允许失败
 deliver: origin
-说明: 距开奖 65 分钟，两彩种齐全才推送。若 21:35 已推送则 skip
+说明: 距开奖 65 分钟。与 21:35 相同逻辑，dedup_key 自动去重，已推送过则 skip
 ```
 
 #### 任务 6 — 23:10 复盘兜底
 
 ```
 时间: 23:10
-命令: bash scripts/push/lottery_review_push.sh --final（内部 --final-check）
+命令: bash scripts/push/lottery_review_push.sh --final
 失败处理: 允许失败
 deliver: origin
-说明: 最终兜底。齐全推完整复盘，未齐推"无法完成复盘"通知
+说明: 最终兜底。lottery_review_job.py --stage final：齐全推完整复盘，未齐调 hermes_push --final-check 输出"无法完成复盘"兜底通知
 ```
 
 ---
