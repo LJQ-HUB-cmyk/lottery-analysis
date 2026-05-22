@@ -178,17 +178,25 @@ def main():
                 timeout=60,
             )
             stderr_text = result.stderr.decode("utf-8", errors="replace")
+            stdout_text = result.stdout.decode("utf-8", errors="replace")
             if stderr_text:
                 print(stderr_text, file=sys.stderr)
 
-            # 如果 hermes_push 因为去重跳过了，直接输出兜底文本
-            if result.returncode == 0 and result.stdout.decode("utf-8", errors="replace").strip():
-                print(result.stdout.decode("utf-8", errors="replace"))
-            elif "[跳过]" in stderr_text:
+            if "[跳过]" in stderr_text:
                 print(f"[SKIP] 兜底通知今日已发送过", file=sys.stderr)
                 status["status"] = SKIPPED_ALREADY_SENT
                 write("lottery_review", status)
+                sys.exit(0)
 
+            if result.returncode != 0 or not stdout_text.strip():
+                status["status"] = ERROR
+                status["ok"] = False
+                status["reason"] = f"hermes_push --final-check 异常 exit={result.returncode}"
+                print(f"[ERROR] {status['reason']}", file=sys.stderr)
+                write("lottery_review", status)
+                sys.exit(2)
+
+            print(stdout_text)
             sys.exit(0)
 
         # ── Step 4: 两种彩票齐全 → 正常复盘 ──

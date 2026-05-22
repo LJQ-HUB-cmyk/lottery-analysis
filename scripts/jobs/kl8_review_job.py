@@ -168,19 +168,26 @@ def main():
             timeout=60,
         )
         stderr_output = result.stderr.decode("utf-8", errors="replace")
+        stdout_text = result.stdout.decode("utf-8", errors="replace")
+
         if stderr_output:
             print(stderr_output, file=sys.stderr)
-
-        if result.returncode != 0:
-            print(f"[WARN] hermes_push 返回 exit={result.returncode}", file=sys.stderr)
-
-        stdout_text = result.stdout.decode("utf-8", errors="replace")
-        if stdout_text.strip():
-            print(stdout_text)  # 推送正文 → stdout
 
         if "[跳过]" in stderr_output and "已推送过" in stderr_output:
             status["status"] = SKIPPED_ALREADY_SENT
             write("kl8_review", status)
+            sys.exit(0)
+
+        if result.returncode != 0:
+            status["status"] = ERROR
+            status["ok"] = False
+            status["reason"] = f"hermes_push 异常 exit={result.returncode}"
+            print(f"[ERROR] {status['reason']}", file=sys.stderr)
+            write("kl8_review", status)
+            sys.exit(2)
+
+        if stdout_text.strip():
+            print(stdout_text)
 
         sys.exit(0)
 
