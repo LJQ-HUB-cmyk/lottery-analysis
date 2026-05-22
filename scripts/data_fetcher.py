@@ -799,6 +799,8 @@ def main():
                     cb.record_failure('d3_eastmoney', **em_cfg)
 
         else:  # auto: eastmoney primary → zhcw fallback → verify
+            d3_primary_source = None  # 追踪主源，用于双源互验
+
             # Primary: eastmoney
             if cb.should_skip('d3_eastmoney', **em_cfg):
                 logger.info("福彩3D: eastmoney 冷却中")
@@ -809,6 +811,7 @@ def main():
                     logger.error("福彩3D(eastmoney): 异常 {}".format(e))
                 if df_d3 is not None and len(df_d3) > 0:
                     cb.record_success('d3_eastmoney')
+                    d3_primary_source = 'eastmoney'
                 else:
                     cb.record_failure('d3_eastmoney', **em_cfg)
 
@@ -823,18 +826,34 @@ def main():
                         logger.error("福彩3D(zhcw): 异常 {}".format(e))
                     if df_d3 is not None and len(df_d3) > 0:
                         cb.record_success('d3_zhcw')
-                        logger.warning("⚠️ 福彩3D: 主源(eastmoney)失败，回退到zhcw")
+                        d3_primary_source = 'zhcw'
+                        logger.warning("福彩3D: 主源(eastmoney)失败，回退到zhcw")
                     else:
                         cb.record_failure('d3_zhcw', **zhcw_cfg)
 
-            # 双源校验
+            # 双源校验：用不同于主源的源做交叉验证
             if args.source == 'auto' and df_d3 is not None and len(df_d3) > 0:
                 df_verify = None
-                if not cb.should_skip('d3_eastmoney', **em_cfg):
-                    try:
-                        df_verify = fetch_3d_from_eastmoney(max_pages=1)
-                    except Exception:
-                        pass
+                verify_source = None
+
+                if d3_primary_source == 'eastmoney':
+                    # 主源 eastmoney → 用 zhcw 验证
+                    if not cb.should_skip('d3_zhcw', **zhcw_cfg):
+                        try:
+                            df_verify = fetch_3d_from_zhcw(max_pages=1)
+                            verify_source = 'zhcw'
+                        except Exception:
+                            logger.warning("验证源 zhcw 不可用，跳过双源校验")
+                elif d3_primary_source == 'zhcw':
+                    # 主源 zhcw → 用 eastmoney 验证
+                    if not cb.should_skip('d3_eastmoney', **em_cfg):
+                        try:
+                            df_verify = fetch_3d_from_eastmoney(max_pages=1)
+                            verify_source = 'eastmoney'
+                        except Exception:
+                            logger.warning("验证源 eastmoney 不可用，跳过双源校验")
+                # 如果 d3_primary_source 未确定（理论上不应发生），跳过校验
+
                 if df_verify is not None and len(df_verify) > 0:
                     latest_main = str(df_d3['期号'].iloc[0])
                     verify_row = df_verify[df_verify['期号'].astype(str) == latest_main]
@@ -857,10 +876,11 @@ def main():
                         num_v = str(verify_row[vfy_col].iloc[0])
 
                         if num_main == num_v:
-                            logger.info("✅ 双源校验通过: 期号{} 号码{}一致".format(latest_main, num_main))
+                            logger.info("双源校验通过: 主源{} vs 验证源{} 期号{} 号码{}一致".format(
+                                d3_primary_source, verify_source, latest_main, num_main))
                         else:
-                            logger.warning("⚠️ 双源校验不一致: 期号{} 主源={} 校验源={}".format(
-                                latest_main, num_main, num_v))
+                            logger.warning("双源校验不一致: 期号{} 主源({})={} 验证源({})={}".format(
+                                latest_main, d3_primary_source, num_main, verify_source, num_v))
                             # 冲突写入结构化 JSON 隔离区
                             main_date = str(df_d3[df_d3['期号'].astype(str) == latest_main]['开奖日期'].iloc[0]) \
                                 if '开奖日期' in df_d3.columns else \
@@ -872,10 +892,10 @@ def main():
                                 if '日期' in verify_row.columns else ''
                             _quarantine_source_conflict(
                                 lottery='d3', issue=latest_main, expected_date='',
-                                primary_source='eastmoney', primary_number=num_main, primary_date=main_date,
-                                verify_source='zhcw', verify_number=num_v, verify_date=vfy_date)
+                                primary_source=d3_primary_source, primary_number=num_main, primary_date=main_date,
+                                verify_source=verify_source, verify_number=num_v, verify_date=vfy_date)
                     else:
-                        logger.info("ℹ️ 校验源尚无期号{}的数据".format(latest_main))
+                        logger.info("校验源({})尚无期号{}的数据".format(verify_source, latest_main))
 
         if df_d3 is not None and len(df_d3) > 0:
             save_incremental(df_d3, 'd3')

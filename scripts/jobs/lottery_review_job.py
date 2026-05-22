@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -78,10 +79,11 @@ def read_json(path: Path) -> dict:
         return {}
 
 
-def check_lottery_ready(lottery: str) -> tuple[bool, str]:
+def check_lottery_ready(lottery: str, start_ts: float = None) -> tuple[bool, str]:
     """
     检查指定彩种开奖数据是否就绪。
-    通过 compare_latest.json 的 status 字段判断。
+    通过 compare_latest.json 的 status 字段 + 文件修改时间判断。
+    start_ts: 本轮 job 启动时间（用于防过期 compare 文件）。
     返回 (ready, reason)。
     """
     path = REPORT_DIR / f"{lottery}_compare_latest.json"
@@ -91,6 +93,12 @@ def check_lottery_ready(lottery: str) -> tuple[bool, str]:
 
     status = data.get("状态", "")
     error = data.get("错误", "")
+
+    # 检查文件是否本轮生成（防旧 compare JSON 被误判为就绪）
+    if start_ts is not None:
+        mtime = path.stat().st_mtime
+        if mtime < start_ts - 2:
+            return False, f"compare 文件不是本轮生成 (mtime={mtime:.0f} < start={start_ts:.0f})"
 
     if status == "waiting_actual":
         return False, data.get("说明", "等待开奖数据")
@@ -124,14 +132,15 @@ def main():
 
     try:
         # ── Step 1: 执行 daily_review.py ──
+        start_ts = time.time()  # 记录启动时间，用于防过期 compare 文件
         daily_ok, daily_output = run(
             ["scripts/daily_review.py"], "拉取开奖 + 特征工程 + 三策略对比 + 复盘摘要",
             timeout=600,
         )
 
         # ── Step 2: 检查两种彩票开奖是否齐全 ──
-        pls_ready, pls_msg = check_lottery_ready("pls")
-        d3_ready, d3_msg = check_lottery_ready("d3")
+        pls_ready, pls_msg = check_lottery_ready("pls", start_ts)
+        d3_ready, d3_msg = check_lottery_ready("d3", start_ts)
         both_ready = pls_ready and d3_ready
 
         # 尝试从 compare JSON 提取期号

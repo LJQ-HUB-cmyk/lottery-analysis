@@ -44,6 +44,36 @@ PUSH_DIR.mkdir(parents=True, exist_ok=True)
 CN_TZ = timezone(timedelta(hours=8))
 
 
+# ── 安全类型转换 ──────────────────────────────────────
+
+def safe_int(value, default=0):
+    """安全转 int：处理 None、空字符串、NaN、异常字符串。"""
+    try:
+        if value is None:
+            return default
+        s = str(value).strip()
+        if not s or s.lower() in {"nan", "none", "null"}:
+            return default
+        return int(float(s))
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_float(value, default=0.0):
+    """安全转 float：处理 None、空字符串、NaN、异常字符串。"""
+    try:
+        if value is None:
+            return default
+        s = str(value).strip()
+        if not s or s.lower() in {"nan", "none", "null"}:
+            return default
+        return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
+# ── 工具函数 ──────────────────────────────────────────
+
 def now() -> datetime:
     return datetime.now(CN_TZ)
 
@@ -199,8 +229,8 @@ def format_review_section() -> str:
 
         for item in items:
             st = item.get("策略", "default")
-            sum_err = int(item.get("Top1和值误差", 99))
-            span_err = int(item.get("Top1跨度误差", 99))
+            sum_err = safe_int(item.get("Top1和值误差"), 99)
+            span_err = safe_int(item.get("Top1跨度误差"), 99)
             form_ok = parse_bool(item.get("Top1形态一致", ""))
             score = sum_err + span_err
             direct_hit = parse_bool(item.get("直选命中Top30", ""))
@@ -604,8 +634,8 @@ def build_review_performance() -> str:
             direct_hits = sum(1 for r in recent if parse_bool(r.get("直选命中Top30", "")))
             group_hits = sum(1 for r in recent if parse_bool(r.get("组选命中Top30", "")))
             morph_hits = sum(1 for r in recent if parse_bool(r.get("Top1形态一致", "")))
-            sum_errors = [int(r.get("Top1和值误差", 0)) for r in recent]
-            span_errors = [int(r.get("Top1跨度误差", 0)) for r in recent]
+            sum_errors = [safe_int(r.get("Top1和值误差"), 0) for r in recent]
+            span_errors = [safe_int(r.get("Top1跨度误差"), 0) for r in recent]
             avg_sum = sum(sum_errors) / total if total else 0
             avg_span = sum(span_errors) / total if total else 0
 
@@ -694,8 +724,8 @@ def build_review_message() -> str:
 
             direct_hit = parse_bool(item.get("直选命中Top30", ""))
             group_hit = parse_bool(item.get("组选命中Top30", ""))
-            sum_err = int(item.get("Top1和值误差", 99))
-            span_err = int(item.get("Top1跨度误差", 99))
+            sum_err = safe_int(item.get("Top1和值误差"), 99)
+            span_err = safe_int(item.get("Top1跨度误差"), 99)
             form_ok = parse_bool(item.get("Top1形态一致", ""))
 
             hit_range = item.get("命中范围", "")
