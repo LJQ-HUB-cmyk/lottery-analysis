@@ -26,7 +26,7 @@
 | 时间 | 命令 | 说明 | 模式 |
 |------|------|------|:----:|
 | 22:05 | `bash scripts/push/lottery_review_push.sh --prepare-only` | **拉取开奖 + 应用人工修正**（不推送） | no_agent |
-| 22:05 | `python scripts/kl8/check.py` | **KL8 健康检查** | agent |
+| 22:05 | `bash scripts/push/kl8_check_push.sh` | **KL8 健康检查**（异常时主动推送） | no_agent |
 | 22:10 | `bash scripts/push/lottery_review_push.sh --lottery pls --final` | **排列三复盘**：带 Top30，未齐推兜底通知 | no_agent |
 | 22:15 | `bash scripts/push/lottery_review_push.sh --lottery d3 --final` | **福彩3D复盘**：带 Top30，未齐推兜底通知 | no_agent |
 | 22:20 | `bash scripts/push/kl8_review_push.sh` | **KL8 复盘**：带完整候选池 | no_agent |

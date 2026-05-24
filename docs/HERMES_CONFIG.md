@@ -81,10 +81,11 @@ description = 快乐8预测推送：自闭环 fetcher→predictor→stats→推�
 
 [task-kl8-check]
 cron = 05 22 * * *
-command = cd /home/admin/bendi/lottery-analysis && .venv/bin/python scripts/kl8/check.py
+command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/kl8_check_push.sh
 on_failure = continue
-deliver = local
-description = 快乐8：全链路健康检查（与复盘准备同步执行）
+deliver = origin
+no_agent = true
+description = 快乐8：全链路健康检查（异常时主动推送通知）
 
 [task-kl8-review-push]
 cron = 20 22 * * *
