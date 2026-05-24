@@ -122,31 +122,26 @@ Hermes 执行环境需配置以下变量：
 ## 两段式推送设计
 
 ```
-下午（14:40）：预测推送
-  └── lottery_predict_push.sh → lottery_predict_job.py（自闭环）
-      ├── run_daily --strategy all --top-k 30
-      ├── source_health
-      └── hermes_push --mode predict --dedup-key predict:{date}:pls-{issue}:d3-{issue}
+下午（14:40 / 14:50）：预测推送
+  ├── lottery_predict_push.sh → lottery_predict_job.py（自闭环）
+  │     ├── run_daily --strategy all --top-k 30
+  │     ├── source_health
+  │     └── hermes_push --mode predict --dedup-key predict:{date}:pls-{issue}:d3-{issue}
+  └── kl8_predict_push.sh → kl8_predict_job.py
+        └── dedup_key = kl8_predict:{issue}
 
-晚上（21:35 / 22:05 / 23:10）：复盘推送
-  └── lottery_review_push.sh --stage normal|final
-      └── lottery_review_job.py → daily_review + 开奖齐全判断 + hermes_push
-          ├── normal: 两彩种未齐 → skipped_waiting，不推送
-          ├── final: 未齐 → 推送兜底通知（dedup_key=review_missing:{date}）
-          └── 齐全 → dedup_key = review:{date}:pls-{issue}:d3-{issue}
-
-快乐8（独立模块）：
-  14:50 → kl8_predict_push.sh → kl8_predict_job.py
-          └── dedup_key = kl8_predict:{issue}
-  22:00 → check.py → 全链路健康检查
-  22:15 → kl8_review_push.sh → kl8_review_job.py
-          └── 删旧文件 + 时间戳校验 + dedup_key = kl8_review:{issue}
+晚上（22:05 → 22:10 → 22:15 → 22:20）：单彩种独立复盘推送
+  ├── 22:05 lottery_review_push.sh --prepare-only（拉取开奖+人工修正）
+  ├── 22:10 lottery_review_push.sh --lottery pls --final（排列三复盘+Top30）
+  ├── 22:15 lottery_review_push.sh --lottery d3 --final（福彩3D复盘+Top30）
+  └── 22:20 kl8_review_push.sh（KL8复盘+候选池）
 ```
 
 **架构层次：**
 
 ```
 Hermes / cron            → 定时触发
+~/.hermes/scripts/*.sh   → 包装脚本（no_agent 要求脚本在此目录）
 scripts/push/*.sh        → 薄入口：切目录、加锁、日志、启动 Python
 scripts/jobs/*.py        → 业务编排：拉取、预测/复盘、状态判断、去重
 scripts/hermes_push.py   → 推送内容生成 + 去重 + 发送
@@ -155,70 +150,10 @@ output/status/*.json     → 每次任务的状态记录
 
 **核心改进：**
 
-- 下午 14:40 单一 Job 入口，自闭环生成预测+推送
-- 预测和复盘分开推送，不再混在同一条消息里
-- 期号不再出现 "预测 26128 复盘 26127" 的混淆
-- 晚间三波复盘自带防重复（send_log.jsonl + 文件锁），不会重复轰炸
-
----
-
-## 定时任务清单
-
-### 下午预测链路（14:40 单一入口）
-
-#### 任务 1 — 14:40 预测生成并推送
-
-```
-时间: 14:40
-命令: cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_predict_push.sh
-失败处理: 允许失败
-deliver: origin
-no_agent: true
-说明: 自闭环 → lottery_predict_job.py 内部执行：
-  1. run_daily.py --strategy all --top-k 30（数据抓取+特征+统计+三策略评分）
-  2. source_health.py（健康报告）
-  3. hermes_push.py --mode predict --dedup-key ...（推送）
-  4. 写 output/status/lottery_predict_status.json
-  dedup_key = predict:{date}:pls-{issue}:d3-{issue}
-```
-
----
-
-### 晚间复盘链路（21:35 / 22:05 / 23:10）
-
-> 三段式补偿：数据源通常在 21:00 开奖后 20-30 分钟更新，三波覆盖延迟场景。
-> Shell 薄入口 → Python job 编排：`lottery_review_push.sh` → `lottery_review_job.py`（内部：daily_review + 开奖齐全判断 + hermes_push）
-> **防重复**：dedup_key 业务键去重 + flock 全流程锁，同一期只推送一次。
-
-#### 任务 4 — 21:35 复盘尝试
-
-```
-时间: 21:35
-命令: bash scripts/push/lottery_review_push.sh
-失败处理: 允许失败
-deliver: origin
-说明: 开奖后 35 分钟。lottery_review_job.py --stage normal：两彩种齐全才调 hermes_push，未齐写 skipped_waiting 状态并 exit 0
-```
-
-#### 任务 5 — 22:05 复盘尝试
-
-```
-时间: 22:05
-命令: bash scripts/push/lottery_review_push.sh
-失败处理: 允许失败
-deliver: origin
-说明: 距开奖 65 分钟。与 21:35 相同逻辑，dedup_key 自动去重，已推送过则 skip
-```
-
-#### 任务 6 — 23:10 复盘兜底
-
-```
-时间: 23:10
-命令: bash scripts/push/lottery_review_push.sh --final
-失败处理: 允许失败
-deliver: origin
-说明: 最终兜底。lottery_review_job.py --stage final：齐全推完整复盘，未齐调 hermes_push --final-check 输出"无法完成复盘"兜底通知
-```
+- 单彩种独立推送：PLS/D3/KL8 分开推送，不再等两彩种齐全
+- 每条推送自带 `--final` 兜底，不需要单独的 23:10 任务
+- dedup_key 按彩种拆分（`review:{date}:pls-{issue}`），互不干扰
+- 锁和日志文件按彩种隔离，不会互相阻塞
 
 ---
 

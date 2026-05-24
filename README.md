@@ -294,29 +294,30 @@ python run_daily.py pls --top-k 20 --exclude-recent 3
 脚本自动执行：seed数据初始化 → 数据更新 → 特征工程 → 统计引擎 → 评分预测 → 可视化。
 预测结果保存至 `output/predictions/{lottery}_predict_{期号}.json`。
 
-### 手动流程
+### 每日自动推送（Hermes cron）
 
 | 时间 | 操作 | 模式 | 说明 |
 |:---|:-----|:----:|:-----|
-| 14:40 | **自动：** `scripts/push/lottery_predict_push.sh` | **no_agent** ✅ | 自闭环：Job → run_daily + source_health + 推送预测 |
-| 14:50 | **自动：** `scripts/push/kl8_predict_push.sh` | **no_agent** ✅ | KL8预测：kl8_predict_job.py → fetcher → predictor → 推送 |
-| 21:35 | **自动：** `scripts/push/lottery_review_push.sh`（--stage normal） | **no_agent** ✅ | 复盘第1波：两彩种齐全才推送 |
-| 22:05 | **自动：** 同上（dedup_key自动去重） | **no_agent** ✅ | 复盘第2波 |
-| 22:15 | **自动：** `scripts/push/kl8_review_push.sh` | **no_agent** ✅ | KL8复盘：kl8_review_job.py（删旧文件+时间戳+期号校验） |
-| 23:10 | **自动：** `scripts/push/lottery_review_push.sh`（--stage final） | **no_agent** ✅ | 复盘兜底：齐全推复盘，未齐推兜底通知 |
+| 14:40 | `bash scripts/push/lottery_predict_push.sh` | no_agent | PLS/D3 预测（自闭环：Job→run_daily→hermes_push） |
+| 14:50 | `bash scripts/push/kl8_predict_push.sh` | no_agent | KL8 预测 |
+| 22:05 | `bash scripts/push/lottery_review_push.sh --prepare-only` | no_agent | 拉取开奖+应用人工修正（不推送） |
+| 22:10 | `bash scripts/push/lottery_review_push.sh --lottery pls --final` | no_agent | 排列三复盘（带Top30，未齐推兜底） |
+| 22:15 | `bash scripts/push/lottery_review_push.sh --lottery d3 --final` | no_agent | 福彩3D复盘（带Top30，未齐推兜底） |
+| 22:20 | `bash scripts/push/kl8_review_push.sh` | no_agent | KL8 复盘（带完整候选池） |
 
-> **Shell 薄入口 + Python Job 编排**：脚本只做 cd/加锁/启动/日志，业务判断全部在 Python job 层。
-> **业务键去重（dedup_key）**：按期号去重，同一期号同日不重复推送。
-> 详见 [docs/HERMES_CONFIG.md](docs/HERMES_CONFIG.md) 和 [docs/2026-05-22-项目稳定化改造记录.md](docs/2026-05-22-项目稳定化改造记录.md)。
+> **单彩种独立推送**：PLS/D3/KL8 分开推送，哪个数据齐了推哪个，不再等两彩种齐全。
+> **dedup_key 去重**：按期号拆分（`review:{date}:pls-{issue}`），同一期只推一次。
+> 详见 [docs/HERMES_CONFIG.md](docs/HERMES_CONFIG.md)。
 
-## Job 架构（v2.15.0 新增）
+## Job 架构（v2.15.0+）
 
 Shell 脚本降级为薄入口（cd/加锁/启动/日志），业务逻辑迁移到 Python job 层：
 
 ```bash
-# 晚间复盘（推荐使用）
-python scripts/jobs/lottery_review_job.py --stage normal   # 两彩种齐全才推送
-python scripts/jobs/lottery_review_job.py --stage final    # 不齐也推送兜底通知
+# 晚间复盘（单彩种独立推送）
+python scripts/jobs/lottery_review_job.py --prepare-only                    # 只拉数据不推送
+python scripts/jobs/lottery_review_job.py --lottery pls --final             # 排列三复盘（带Top30）
+python scripts/jobs/lottery_review_job.py --lottery d3 --final              # 福彩3D复盘（带Top30）
 
 # KL8 复盘（含删旧文件+时间戳+期号三重校验）
 python scripts/jobs/kl8_review_job.py

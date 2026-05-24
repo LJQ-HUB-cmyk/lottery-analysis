@@ -2,6 +2,23 @@
 
 > 集中式变更日志，按版本从新到旧排列。单日详细记录见 `docs/` 目录。
 
+## v2.17.0 (2026-05-25)
+
+- **auto_tuned 自动调参闭环**：`tune_scoring_params.py`（Optuna walk-forward）+ `audit_lottery_data.py`（数据审计）+ `report_tuning_status.py`（灰度观察）
+- **auto_tuned 接入全链路**：`run_daily.py --strategy all` 自动包含、`daily_review.py` 复盘对比、`hermes_push.py` 推送展示
+- **KL8 健康检查推送**：`kl8_check_push.sh` 改为 no_agent/origin，异常时主动推送飞书
+- **复盘推送 v3 重构**：命中指标按命中号码实时计算、命中展最佳策略Top30/未中展Top10、5列无编号、组选池"缺数字X"、单彩种复盘只显示对应彩种近期表现
+
+## v2.16.0 (2026-05-24)
+
+- **单彩种独立推送**：PLS/D3/KL8 分开推送（22:05准备→22:10PLS→22:15D3→22:20KL8），删除旧三波补偿
+- **复盘日期口径修正**：标题 `开奖复盘｜推送日`，归档按期号另存
+- **Top30 全量展示**：复盘消息每条策略展示完整30注（带排名编号→5列无编号）
+- **五码/六码组选**：`top_digits()` + `check_group_hit()`，预测+复盘推送展示组选池和命中检测
+- **人工开奖修正兜底**：`draw_overrides.csv` + `apply_draw_overrides.py` + 审计日志
+- **代码审查大修复**：41项发现→25项修复→15项延后→1项跳过（详见审查报告）
+- **文档大清理**：删除过期文档、精简冗余、更新所有过期引用
+
 ## v2.15.0 (2026-05-22)
 
 - **Job 架构改造**：Shell 脚本瘦身为薄入口（cd/加锁/启动Python/日志），业务逻辑迁移到 Python job

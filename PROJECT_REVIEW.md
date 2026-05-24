@@ -92,7 +92,7 @@
 - compare_result 按期号查找预测文件 + waiting_actual 状态分类（exit 0 不覆盖 latest）
 - HERMES_CONFIG 6 cron job 结构化配置
 - push_state.json 防重复推送
-- build_review_message 重写为"今日预测 vs 开奖直接对比"
+- build_review_message 重写为"开奖复盘｜推送日"（v2.16.0 起改为单彩种独立推送 + 命中指标修正）
 
 ### v2.7.1（历史）
 - Hermes cron 适配：`daily_review.py` 一键复盘（拉取→对比→摘要）；`compare_result.py --strategy` 多策略对比
