@@ -472,7 +472,8 @@ def format_prediction_section(lottery: str, label: str) -> str:
 
     # 三策略共振
     consensus_nums: dict[str, int] = {}
-    for suffix, sname in [("", "default"), ("_conservative", "稳健"), ("_diversity", "多样性")]:
+    for suffix, sname in [("", "default"), ("_conservative", "稳健"),
+                           ("_diversity", "多样性"), ("_auto_tuned", "自动调参")]:
         sp = PRED_DIR / f"latest_{lottery}{suffix}.json"
         sd = read_json(sp)
         if sd:
@@ -704,11 +705,11 @@ def build_review_performance() -> str:
         lottery_data.setdefault(lotto, {}).setdefault(st, []).append(row)
 
     parts = ["━━━━━━━━━━━━━━\n三、近期策略表现\n━━━━━━━━━━━━━━"]
-    label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性"}
+    label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性", "auto_tuned": "自动调参"}
 
     for lotto in ["排列三", "福彩3D"]:
         parts.append(f"\n【{lotto}】")
-        for st in ["default", "conservative", "diversity"]:
+        for st in ["default", "conservative", "diversity", "auto_tuned"]:
             records = lottery_data.get(lotto, {}).get(st, [])
             if not records:
                 continue
@@ -822,7 +823,8 @@ def build_review_message(lottery_filter: str = "all") -> str:
 
         # 各策略对比
         default_recommends = []  # 用于组选展示
-        for st_key, label in [("default", "默认"), ("conservative", "稳健"), ("diversity", "多样性")]:
+        for st_key, label in [("default", "默认"), ("conservative", "稳健"),
+                               ("diversity", "多样性"), ("auto_tuned", "自动调参")]:
             item = next((r for r in items if r.get("策略", "") == st_key), None)
             if not item:
                 continue
