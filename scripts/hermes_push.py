@@ -760,8 +760,9 @@ def check_review_ready(lottery_filter: str = "all") -> tuple[bool, str]:
     return False, "无复盘数据（review_history 为空）"
 
 
-def build_review_performance() -> str:
-    """从 review_history 计算最近策略表现摘要"""
+def build_review_performance(lottery_filter: str = "all") -> str:
+    """从 review_history 计算最近策略表现摘要。
+    lottery_filter: all=全部 / pls=只排列三 / d3=只福彩3D。"""
     rows = read_review_csv()
     if not rows:
         return "暂无复盘记录"
@@ -779,7 +780,10 @@ def build_review_performance() -> str:
         if row.get("策略", "") == "默认":
             rows[i]["策略"] = "标准"
 
-    for lotto in ["排列三", "福彩3D"]:
+    lotto_map = {"pls": "排列三", "d3": "福彩3D"}
+    wanted = ["排列三", "福彩3D"] if lottery_filter == "all" else [lotto_map.get(lottery_filter, lottery_filter)]
+
+    for lotto in wanted:
         parts.append(f"\n【{lotto}】")
         for st in ["default", "conservative", "diversity", "auto_tuned"]:
             records = lottery_data.get(lotto, {}).get(st, [])
@@ -1036,7 +1040,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
             override_issues[lt_key] = {"issue": issue, "number": actual}
 
     # 近期表现
-    parts.append(build_review_performance())
+    parts.append(build_review_performance(lottery_filter))
     parts.append("")
     parts.append(format_health_section(override_issues))
     parts.append("")
