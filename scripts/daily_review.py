@@ -66,6 +66,10 @@ def main():
     # 1. 拉取最新开奖数据
     results["拉取开奖数据"] = run(["scripts/data_fetcher.py", "--all"], "拉取最新开奖数据")
 
+    # 1.5 应用人工开奖修正（自动抓取失败时的兜底）
+    results["应用人工修正"] = run(
+        ["scripts/apply_draw_overrides.py"], "应用人工开奖修正")
+
     # 2. 特征工程
     for lt in lotteries:
         results[f"{lt} 特征工程"] = run(

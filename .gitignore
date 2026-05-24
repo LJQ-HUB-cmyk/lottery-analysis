@@ -56,6 +56,10 @@ output/status/*
 # 坏数据隔离区
 data/quarantine/
 
+# 人工修正表（模板跟踪，审计日志忽略）
+data/manual/*.jsonl
+!data/manual/draw_overrides.csv
+
 logs/*
 !logs/.gitkeep
 
