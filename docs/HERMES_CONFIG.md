@@ -1,7 +1,7 @@
 # Hermes 定时任务配置
 
 > 此文件供 Hermes 读取并自动配置定时任务。修改此文件后，同步至 Hermes 平台生效。
-> 最后更新：2026-05-24（v2.16.0：单彩种独立推送 + 包装脚本直接调 Python job）
+> 最后更新：2026-05-24（v2.16.0：单彩种独立推送 + 包装脚本通过薄入口调用）
 
 ---
 
@@ -26,7 +26,8 @@ cron_mode = allow
 ### 三、定时任务（8 个任务）
 
 > 所有推送类任务均为 no_agent=true 模式，绕过安全审批链。
-> Hermes cron 包装脚本直接调用 Python job（`~/.hermes/scripts/*.sh`），不经过 `scripts/push/` 下的 shell 薄入口。
+> Hermes cron 包装脚本（`~/.hermes/scripts/*.sh`）通过 `scripts/push/` 下的 shell 薄入口调用 Python job，保留锁文件、日志、23点自动 final 等机制。
+> 修改 `scripts/push/` 下的脚本后须手动 `cp` 到 `~/.hermes/scripts/`（软链接被 Hermes 拦截）。
 > 晚间复盘单彩种独立推送：22:05 准备数据 → 22:10 PLS → 22:15 D3 → 22:20 KL8。
 > 每条推送自带 `--final` 兜底（数据不齐时推送"无法复盘"通知）。
 > 去重按彩种拆分：PLS/D3 各自独立 dedup_key，互不干扰。

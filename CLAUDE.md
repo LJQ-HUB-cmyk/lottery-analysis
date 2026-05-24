@@ -25,21 +25,25 @@
 
 | 时间 | 命令 | 说明 | 模式 |
 |------|------|------|:----:|
-| 22:05 | `.venv/bin/python scripts/jobs/lottery_review_job.py --prepare-only` | **拉取开奖 + 应用人工修正**（不推送） | no_agent |
+| 22:05 | `bash scripts/push/lottery_review_push.sh --prepare-only` | **拉取开奖 + 应用人工修正**（不推送） | no_agent |
 | 22:05 | `python scripts/kl8/check.py` | **KL8 健康检查** | agent |
-| 22:10 | `.venv/bin/python scripts/jobs/lottery_review_job.py --lottery pls --stage final` | **排列三复盘**：带 Top30，未齐推兜底通知 | no_agent |
-| 22:15 | `.venv/bin/python scripts/jobs/lottery_review_job.py --lottery d3 --stage final` | **福彩3D复盘**：带 Top30，未齐推兜底通知 | no_agent |
+| 22:10 | `bash scripts/push/lottery_review_push.sh --lottery pls --final` | **排列三复盘**：带 Top30，未齐推兜底通知 | no_agent |
+| 22:15 | `bash scripts/push/lottery_review_push.sh --lottery d3 --final` | **福彩3D复盘**：带 Top30，未齐推兜底通知 | no_agent |
 | 22:20 | `bash scripts/push/kl8_review_push.sh` | **KL8 复盘**：带完整候选池 | no_agent |
 
 > 单彩种独立推送：哪个彩种数据齐了就推哪个，不再互相等待。
 > 每条推送自带 `--final` 兜底（数据不齐时推送"无法复盘"通知），不再需要 23:10 独立任务。
-> Hermes cron 包装脚本直接调用 Python job（`~/.hermes/scripts/lottery_review_*.sh`），不经 shell 薄入口，参数直传。
+> Hermes cron 包装脚本（`~/.hermes/scripts/lottery_review_*.sh`）通过 shell 薄入口调用 Python job，保留锁文件、日志、23点自动 final 等机制。
 > 去重靠 dedup_key（业务键），按彩种拆分：`review:{date}:pls-{issue}` / `review:{date}:d3-{issue}`。
 > 锁和日志文件均按彩种隔离。
 
 > 快乐8每期开20个号码(1-80)。策略：热号12+冷号8混合生成20码池 + 选四主推。复盘计算命中数/奖金/盈亏。累计表现自动追踪近N期。
 >
-> **推送脚本维护说明：** Hermes no_agent cron 使用的包装脚本在 `~/.hermes/scripts/` 下（如 `lottery_review_pls.sh`），它们直接调用 `.venv/bin/python scripts/jobs/*.py` 直传参数，不经过 `scripts/push/` 下的 shell 薄入口。修改 Python job 代码后无需复制脚本。如果新增 no_agent 任务，在 `~/.hermes/scripts/` 下创建新的 `.sh` 包装脚本即可。
+> **推送脚本维护说明：** Hermes no_agent cron 使用的包装脚本在 `~/.hermes/scripts/` 下（如 `lottery_review_pls.sh`），它们通过 `scripts/push/` 下的 shell 薄入口调用 Python job。修改 `scripts/push/*.sh` 后需手动复制到 `~/.hermes/scripts/` 才能生效：
+> ```bash
+> cp scripts/push/*.sh ~/.hermes/scripts/
+> ```
+> Hermes no_agent 模式要求脚本文件必须在 `~/.hermes/scripts/` 目录内（不支持软链接指向外部）。
 
 ## 项目结构
 
