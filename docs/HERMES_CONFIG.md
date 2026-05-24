@@ -27,8 +27,8 @@ cron_mode = allow
 
 > 所有推送类任务均为 no_agent=true 模式，绕过安全审批链。
 > Shell 脚本为薄入口，调用 Python job 负责业务逻辑。
-> 晚间复盘脚本在 23 点后自动启用 --final-check 兜底（无需传参）。
-> KL8 复盘错开到 22:15 避免与 PLS/D3 同时跑。
+> 晚间复盘改为单彩种独立推送：22:05 拉数据 → 22:10 PLS → 22:15 D3 → 22:20 KL8。
+> 每条推送自带 `--final` 兜底（数据不齐时推送"无法复盘"通知）。
 > 修改项目 `scripts/push/` 后须手动 `cp` 到 `~/.hermes/scripts/`（软链接被 Hermes 拦截）。
 
 ```
@@ -42,34 +42,33 @@ deliver = origin
 no_agent = true
 description = 排列三/福彩3D：下午预测生成并推送（自闭环：Job → run_daily → source_health → hermes_push）
 
-# ── 晚间复盘链路（21:35 / 22:05 / 23:10 三波补偿）──
+# ── 晚间复盘链路（22:05 拉取 → 22:10/22:15/22:20 单彩种独立推送）──
 
-[task-review-2135]
-cron = 35 21 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh
-on_failure = continue
-deliver = origin
-no_agent = true
-description = 复盘尝试1：两彩种齐全才推送，未齐静默（send_log+文件锁防重）
-
-[task-review-2205]
+[task-review-prepare-2205]
 cron = 05 22 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh
+command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --prepare-only
+on_failure = continue
+deliver = local
+no_agent = true
+description = 排列三/福彩3D：拉取开奖并生成复盘数据（不推送）
+
+[task-review-pls-2210]
+cron = 10 22 * * *
+command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --lottery pls --final
 on_failure = continue
 deliver = origin
 no_agent = true
-description = 复盘尝试2：两彩种齐全才推送，未齐静默（send_log+文件锁防重）
+description = 排列三单独复盘推送（带Top30）；数据已齐推完整复盘，未齐推兜底通知
 
-[task-review-2310]
-cron = 10 23 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --final
+[task-review-d3-2215]
+cron = 15 22 * * *
+command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --lottery d3 --final
 on_failure = continue
 deliver = origin
 no_agent = true
-description = 复盘兜底：齐全推完整复盘，未齐推无法复盘通知
+description = 福彩3D单独复盘推送（带Top30）；数据已齐推完整复盘，未齐推兜底通知
 
-# ── 快乐8 KL8（14:50 预测 + 22:00 检查 + 22:15 复盘）──
-# KL8 独立 push shell 脚本，不混入 PLS/D3 主流程
+# ── 快乐8 KL8（14:50 预测 + 22:05 检查 + 22:20 复盘）──
 
 [task-kl8-predict-push]
 cron = 50 14 * * *
@@ -80,19 +79,19 @@ no_agent = true
 description = 快乐8预测推送：自闭环 fetcher→predictor→stats→推送
 
 [task-kl8-check]
-cron = 0 22 * * *
+cron = 05 22 * * *
 command = cd /home/admin/bendi/lottery-analysis && .venv/bin/python scripts/kl8/check.py
 on_failure = continue
 deliver = local
-description = 快乐8：全链路健康检查（非0 exit=异常）
+description = 快乐8：全链路健康检查（与复盘准备同步执行）
 
 [task-kl8-review-push]
-cron = 15 22 * * *
+cron = 20 22 * * *
 command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/kl8_review_push.sh
 on_failure = continue
 deliver = origin
 no_agent = true
-description = 快乐8复盘推送：自闭环 fetcher→reviewer→metrics→推送（错开22:05避免冲突）
+description = 快乐8单独复盘推送，带完整候选池（错开PLS/D3推送时间）
 ```
 
 ---

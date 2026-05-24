@@ -113,14 +113,22 @@ def main():
 
     parser = argparse.ArgumentParser(description="PLS/D3 复盘 Job")
     parser.add_argument("--stage", choices=["normal", "final"], default="normal",
-                        help="normal=两彩种齐全才推送；final=不齐也推送兜底通知")
+                        help="normal=目标彩种齐全才推送；final=不齐也推送兜底通知")
+    parser.add_argument("--lottery", choices=["all", "pls", "d3"], default="all",
+                        help="all=排列三+福彩3D合并；pls=只排三；d3=只福彩3D")
+    parser.add_argument("--prepare-only", action="store_true",
+                        help="只拉取开奖并生成复盘数据，不推送")
     args = parser.parse_args()
 
+    targets = ["pls", "d3"] if args.lottery == "all" else [args.lottery]
+    task_name = f"lottery_review_{args.lottery}"
+
     status = {
-        "task": "lottery_review",
+        "task": task_name,
         "date": today_str(),
-        "run_id": f"lottery_review_{now().strftime('%Y%m%d_%H%M%S')}",
+        "run_id": f"lottery_review_{args.lottery}_{now().strftime('%Y%m%d_%H%M%S')}",
         "stage": args.stage,
+        "lottery": args.lottery,
         "status": READY,
         "ok": True,
         "should_push": False,
@@ -132,31 +140,62 @@ def main():
 
     try:
         # ── Step 1: 执行 daily_review.py ──
-        start_ts = time.time()  # 记录启动时间，用于防过期 compare 文件
+        start_ts = time.time()
+        daily_cmd = ["scripts/daily_review.py"]
+        if args.lottery != "all":
+            daily_cmd += ["--lottery", args.lottery]
         daily_ok, daily_output = run(
-            ["scripts/daily_review.py"], "拉取开奖 + 特征工程 + 三策略对比 + 复盘摘要",
+            daily_cmd, "拉取开奖 + 特征工程 + 三策略对比 + 复盘摘要",
             timeout=600,
         )
 
-        # ── Step 2: 检查两种彩票开奖是否齐全 ──
-        pls_ready, pls_msg = check_lottery_ready("pls", start_ts)
-        d3_ready, d3_msg = check_lottery_ready("d3", start_ts)
-        both_ready = pls_ready and d3_ready
+        # ── Step 2: 检查目标彩种开奖是否齐全 ──
+        ready_map = {}
+        issues = {}
+        for lt in targets:
+            r, msg = check_lottery_ready(lt, start_ts)
+            ready_map[lt] = (r, msg)
+            data = read_json(REPORT_DIR / f"{lt}_compare_latest.json")
+            issue = str(data.get("期号", "") or data.get("开奖期号", ""))
+            issues[lt] = issue
+        status["issues"] = issues
 
-        # 尝试从 compare JSON 提取期号
-        pls_data = read_json(REPORT_DIR / "pls_compare_latest.json")
-        d3_data = read_json(REPORT_DIR / "d3_compare_latest.json")
-        pls_issue = str(pls_data.get("期号", "") or pls_data.get("开奖期号", ""))
-        d3_issue = str(d3_data.get("期号", "") or d3_data.get("开奖期号", ""))
-        status["issues"] = {"pls": pls_issue, "d3": d3_issue}
+        selected_ready = all(ready_map[k][0] for k in targets)
 
-        # ── Step 3: 根据齐全状态和 stage 决定行为 ──
-        if not both_ready:
+        # ── Step 2.5: prepare-only 模式 ──
+        if args.prepare_only:
+            status["should_push"] = False
+            status["reason"] = "prepare-only：已完成开奖拉取和复盘准备，不推送"
+            status["finished_at"] = now().strftime("%Y-%m-%dT%H:%M:%S%z")
+            if not selected_ready:
+                missing = [f"{k}({ready_map[k][1]})" for k in targets if not ready_map[k][0]]
+                status["reason"] += f" | 未齐: {'、'.join(missing)}"
+            write(task_name, status)
+            print(f"[OK] prepare-only 完成，{status['reason']}", file=sys.stderr)
+            sys.exit(0)
+
+        # ── Step 3: 构建 dedup_key（单彩种）──
+        if args.lottery == "pls":
+            pls_i = issues.get("pls", "?")
+            dedup_key = f"review:{today_str()}:pls-{pls_i}"
+            miss_key = f"review_missing:{today_str()}:pls"
+        elif args.lottery == "d3":
+            d3_i = issues.get("d3", "?")
+            dedup_key = f"review:{today_str()}:d3-{d3_i}"
+            miss_key = f"review_missing:{today_str()}:d3"
+        else:
+            pls_i = issues.get("pls", "?")
+            d3_i = issues.get("d3", "?")
+            dedup_key = f"review:{today_str()}:pls-{pls_i}:d3-{d3_i}"
+            miss_key = f"review_missing:{today_str()}"
+
+        # ── Step 4: 根据齐全状态和 stage 决定行为 ──
+        if not selected_ready:
             missing = []
-            if not pls_ready:
-                missing.append(f"排列三({pls_msg})")
-            if not d3_ready:
-                missing.append(f"福彩3D({d3_msg})")
+            for k in targets:
+                if not ready_map[k][0]:
+                    label = "排列三" if k == "pls" else "福彩3D"
+                    missing.append(f"{label}({ready_map[k][1]})")
             missing_str = "、".join(missing)
 
             if args.stage == "normal":
@@ -164,23 +203,21 @@ def main():
                 status["should_push"] = False
                 status["reason"] = f"开奖未齐: {missing_str}"
                 print(f"[SKIP] {status['reason']}", file=sys.stderr)
-                write("lottery_review", status)
+                write(task_name, status)
                 sys.exit(0)
 
-            # final 阶段：调用 hermes_push --final-check 输出兜底通知
-            status["dedup_key"] = f"review_missing:{today_str()}"
+            # final 阶段：输出兜底通知
+            status["dedup_key"] = miss_key
             status["should_push"] = True
             status["status"] = READY
             status["reason"] = f"开奖未齐({missing_str})，输出兜底通知"
-            status["issues"] = {}
             status["finished_at"] = now().strftime("%Y-%m-%dT%H:%M:%S%z")
-            write("lottery_review", status)
+            write(task_name, status)
 
-            # --final-check：hermes_push 检测数据未齐时自动生成兜底通知
-            # dedup_key 确保同一日期只推一次，不加 --force
             result = subprocess.run(
                 [PY, "scripts/hermes_push.py", "--mode", "review",
-                 "--dedup-key", status["dedup_key"], "--final-check", "--stdout"],
+                 "--lottery", args.lottery,
+                 "--dedup-key", miss_key, "--final-check", "--stdout"],
                 cwd=str(BASE),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -194,7 +231,7 @@ def main():
             if "[跳过]" in stderr_text:
                 print(f"[SKIP] 兜底通知今日已发送过", file=sys.stderr)
                 status["status"] = SKIPPED_ALREADY_SENT
-                write("lottery_review", status)
+                write(task_name, status)
                 sys.exit(0)
 
             if result.returncode != 0 or not stdout_text.strip():
@@ -202,32 +239,33 @@ def main():
                 status["ok"] = False
                 status["reason"] = f"hermes_push --final-check 异常 exit={result.returncode}"
                 print(f"[ERROR] {status['reason']}", file=sys.stderr)
-                write("lottery_review", status)
+                write(task_name, status)
                 sys.exit(2)
 
             print(stdout_text)
             sys.exit(0)
 
-        # ── Step 4: 两种彩票齐全 → 正常复盘 ──
+        # ── Step 5: 目标彩种齐全 → 正常复盘 ──
         if not daily_ok:
             status["status"] = ERROR
             status["ok"] = False
             status["reason"] = "daily_review.py 执行异常"
             print(f"[ERROR] {status['reason']}", file=sys.stderr)
-            write("lottery_review", status)
+            write(task_name, status)
             sys.exit(2)
 
-        status["dedup_key"] = f"review:{today_str()}:pls-{pls_issue}:d3-{d3_issue}"
+        status["dedup_key"] = dedup_key
         status["should_push"] = True
         status["status"] = READY
         status["reason"] = ""
         status["finished_at"] = now().strftime("%Y-%m-%dT%H:%M:%S%z")
-        write("lottery_review", status)
+        write(task_name, status)
 
         # 调用 hermes_push 输出复盘内容到 stdout
         result = subprocess.run(
             [PY, "scripts/hermes_push.py", "--mode", "review",
-             "--dedup-key", status["dedup_key"], "--stdout"],
+             "--lottery", args.lottery,
+             "--dedup-key", dedup_key, "--stdout"],
             cwd=str(BASE),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -243,7 +281,7 @@ def main():
 
         if "[跳过]" in stderr_text and "已推送过" in stderr_text:
             status["status"] = SKIPPED_ALREADY_SENT
-            write("lottery_review", status)
+            write(task_name, status)
 
         sys.exit(0)
 
@@ -252,7 +290,7 @@ def main():
         status["ok"] = False
         status["reason"] = f"未预期异常: {e}"
         print(f"[ERROR] {status['reason']}", file=sys.stderr)
-        write("lottery_review", status)
+        write(task_name, status)
         sys.exit(2)
 
 

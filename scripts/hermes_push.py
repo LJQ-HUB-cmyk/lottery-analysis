@@ -308,6 +308,35 @@ def extract_top10(data: dict, key: str = "Top10号码") -> list[str]:
     return result[:10]
 
 
+def extract_topn(data: dict, n: int = 30) -> list[str]:
+    """从预测 JSON 提取 TopN 号码列表。依次尝试 Top30/Top20/Top10 字段。"""
+    if not data:
+        return []
+    summary = data.get("摘要", {})
+    nums = (
+        summary.get("Top30号码")
+        or summary.get("Top20号码")
+        or summary.get("Top10号码")
+        or []
+    )
+    return [str(x).zfill(3) for x in nums[:n]]
+
+
+def format_ranked_numbers(nums: list[str], per_line: int = 10) -> str:
+    """格式化带排名的号码列表，每行 per_line 个。"""
+    if not nums:
+        return "-"
+    lines = []
+    for i in range(0, len(nums), per_line):
+        chunk = nums[i:i + per_line]
+        line = " ".join(
+            f"{i + j + 1:02d}.{num}"
+            for j, num in enumerate(chunk)
+        )
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def load_stats_cache(lottery: str) -> dict:
     """加载统计缓存"""
     path = CACHE_DIR / f"{lottery}_stats_latest.json"
@@ -572,16 +601,15 @@ def format_health_section() -> str:
 #  新版两段式推送
 # ═══════════════════════════════════════════
 
-def check_review_ready() -> tuple[bool, str]:
+def check_review_ready(lottery_filter: str = "all") -> tuple[bool, str]:
     """检查复盘数据是否就绪。返回 (ready, message)。
-    - 有有效复盘记录 → ready=True
-    - compare JSON 标记为 waiting_actual → ready=False
-    - 无任何数据 → ready=False
+    lottery_filter: all=检查全部 / pls=只检查排列三 / d3=只检查福彩3D。
     """
-    # 先检查 compare JSON 状态（能区分 waiting vs error）
+    targets = ["pls", "d3"] if lottery_filter == "all" else [lottery_filter]
+
     has_valid_compare = False
     waiting_msgs = []
-    for lottery in ["pls", "d3"]:
+    for lottery in targets:
         path = REPORT_DIR / f"{lottery}_compare_latest.json"
         data = read_json(path)
         if not data:
@@ -600,8 +628,11 @@ def check_review_ready() -> tuple[bool, str]:
     if has_valid_compare:
         return True, ""
 
-    # fallback: 检查 review_history 是否有记录
+    # fallback: 检查 review_history 是否有记录（单彩种时只检查对应彩种）
     rows = read_review_csv()
+    if lottery_filter != "all":
+        lotto_map = {"pls": "排列三", "d3": "福彩3D"}
+        rows = [r for r in rows if r.get("彩种", "") == lotto_map.get(lottery_filter, "")]
     if rows:
         return True, ""
 
@@ -668,13 +699,14 @@ def build_predict_message() -> str:
     return txt[:4000] + "\n\n……内容过长已截断" if len(txt) > 4000 else txt
 
 
-def build_review_message() -> str:
-    """生成复盘推送：开奖复盘（复盘的是前一天开奖，不是今天预测）"""
-    # 先获取期号信息，用于标题
+def build_review_message(lottery_filter: str = "all") -> str:
+    """生成复盘推送：开奖复盘（复盘的是前一天开奖，不是今天预测）。
+    lottery_filter: all=排列三+福彩3D合并 / pls=只排列三 / d3=只福彩3D。
+    """
     rows = pick_latest_review(read_review_csv())
     if not rows:
         return "\n".join([
-            f"📊 开奖复盘｜推送日 {today_str()}",
+            "📊 开奖复盘｜推送日 " + today_str(),
             "",
             "暂无复盘数据",
         ])
@@ -690,12 +722,27 @@ def build_review_message() -> str:
     pls_issue = review_issues.get("排列三", "?")
     d3_issue = review_issues.get("福彩3D", "?")
 
-    parts = [
-        f"📊 开奖复盘｜推送日 {today_str()}",
-        f"复盘对象：排列三 {pls_issue} / 福彩3D {d3_issue}",
-        f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
-        "",
-    ]
+    # 彩种筛选
+    lotto_map = {"pls": "排列三", "d3": "福彩3D"}
+    if lottery_filter in lotto_map:
+        wanted = [lotto_map[lottery_filter]]
+        # 单彩种标题
+        label = lotto_map[lottery_filter]
+        issue = review_issues.get(label, "?")
+        parts = [
+            f"📊 开奖复盘｜{label}｜推送日 {today_str()}",
+            f"复盘对象：{label} {issue}",
+            f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
+            "",
+        ]
+    else:
+        wanted = ["排列三", "福彩3D"]
+        parts = [
+            f"📊 开奖复盘｜推送日 {today_str()}",
+            f"复盘对象：排列三 {pls_issue} / 福彩3D {d3_issue}",
+            f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
+            "",
+        ]
 
     # 按彩种分组获取今日实际开奖和命中情况
     grouped: dict[str, list] = {}
@@ -703,7 +750,7 @@ def build_review_message() -> str:
         lotto = row.get("彩种", "未知")
         grouped.setdefault(lotto, []).append(row)
 
-    for lotto in ["排列三", "福彩3D"]:
+    for lotto in wanted:
         items = grouped.get(lotto, [])
         if not items:
             continue
@@ -741,8 +788,7 @@ def build_review_message() -> str:
                     actual_issue = "".join(c for c in pred_issue if c.isdigit())
                     if actual_issue != issue_digits:
                         st_data = {}  # 期号不匹配，不展示该策略详情
-            top10 = extract_top10(st_data) if st_data else []
-            top5_str = " ".join(top10[:5]) if top10 else "-"
+            top30 = extract_topn(st_data, 30) if st_data else []
 
             direct_hit = parse_bool(item.get("直选命中Top30", ""))
             group_hit = parse_bool(item.get("组选命中Top30", ""))
@@ -765,8 +811,10 @@ def build_review_message() -> str:
                 result_text = f"未命中"
 
             parts.append(f"{result_icon} {label}：{result_text}")
-            parts.append(f"  Top5参考：{top5_str}")
             parts.append(f"  和值差{sum_err}｜跨度差{span_err}｜形态{'一致' if form_ok else '不一致'}")
+            parts.append("")
+            parts.append(f"  Top30预测：")
+            parts.append(format_ranked_numbers(top30))
             parts.append("")
 
     # 近期表现
@@ -1294,7 +1342,7 @@ def main():
         if lottery == "kl8":
             text = build_kl8_review_message()
         elif lottery in ("pls", "d3", "all"):
-            ready, ready_msg = check_review_ready()
+            ready, ready_msg = check_review_ready(args.lottery)
             if not ready:
                 if args.final_check:
                     text = f"⚠️ 无法完成复盘\n\n{ready_msg}\n\n请检查数据源是否正常更新。"
@@ -1303,7 +1351,7 @@ def main():
                     sys.exit(0)
                 print(f"[跳过] {ready_msg}", file=sys.stderr)
                 sys.exit(0)
-            text = build_review_message()
+            text = build_review_message(args.lottery)
         else:
             text = build_daily_message()
     else:
