@@ -384,9 +384,11 @@ uv pip list --python .venv/bin/python
 cd /home/admin/bendi/lottery-analysis
 .venv/bin/python scripts/jobs/lottery_predict_job.py
 
-# 复盘
-cd /home/admin/bendi/lottery-analysis
-.venv/bin/python scripts/jobs/lottery_review_job.py
+# 排列三复盘（带Top30）
+.venv/bin/python scripts/jobs/lottery_review_job.py --lottery pls --final
+
+# 福彩3D复盘（带Top30）
+.venv/bin/python scripts/jobs/lottery_review_job.py --lottery d3 --final
 
 # 强制推送（绕过 dedup）
 .venv/bin/python scripts/hermes_push.py --mode predict --force
@@ -401,3 +403,44 @@ cd /home/admin/bendi/lottery-analysis
 `hermes_push.py` 已内置冷却和退避。如果仍然限频：
 - 改用飞书作为主通道（配置 `FEISHU_WEBHOOK_URL`）
 - 或只用 `--stdout` → `deliver=origin` 路径
+
+---
+
+## 本次更新（v2.17.0）服务器部署步骤
+
+```bash
+# 1. 拉取最新代码
+cd /home/admin/bendi/lottery-analysis
+git pull
+
+# 2. 同步 shell 脚本到 Hermes 目录
+cp scripts/push/*.sh ~/.hermes/scripts/
+
+# 3. 生成 auto_tuned 权重（只需跑一次）
+.venv/bin/python scripts/tune_scoring_params.py --lottery pls --trials 80 --periods 120 --train-window 150
+.venv/bin/python scripts/tune_scoring_params.py --lottery d3 --trials 80 --periods 120 --train-window 150
+
+# 4. 验证 auto_tuned 权重已生成
+ls -l rules/scoring_weights_auto_*.yaml
+
+# 5. 数据审计（确认数据没问题）
+.venv/bin/python scripts/audit_lottery_data.py --lottery all
+
+# 6. Hermes 平台更新定时任务
+# 删除旧任务: task-review-2135, task-review-2205, task-review-2310
+# 新增任务: task-review-prepare-2205, task-review-pls-2210, task-review-d3-2215
+# 修改任务: task-kl8-check（命令改为 bash scripts/push/kl8_check_push.sh, deliver=origin, no_agent=true）
+# 详见本文档"三、定时任务"章节
+```
+
+### Hermes cron 变更对照
+
+| 旧任务 | 新任务 | 变化 |
+|------|------|------|
+| task-review-2135 (21:35) | **删除** | 三波补偿废弃 |
+| task-review-2205 (22:05) | task-review-prepare-2205 | 改为 prepare-only（只拉数据不推送） |
+| — | task-review-pls-2210 (22:10) | **新增**：排列三独立复盘 |
+| — | task-review-d3-2215 (22:15) | **新增**：福彩3D独立复盘 |
+| task-review-2310 (23:10) | **删除** | 每条推送自带 --final 兜底 |
+| task-kl8-review-push (22:15) | task-kl8-review-push (22:20) | 时间错开 5 分钟 |
+| task-kl8-check (22:00) | task-kl8-check (22:05) | 改为 no_agent/origin |
