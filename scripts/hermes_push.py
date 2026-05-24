@@ -669,17 +669,33 @@ def build_predict_message() -> str:
 
 
 def build_review_message() -> str:
-    """生成复盘推送：今日预测 vs 今日开奖直接对比"""
-    parts = [
-        f"📊 今日预测 vs 开奖对比｜{today_str()}",
-        "",
-    ]
-
-    # 从 review_history 获取最新一期（今日开奖）的对比数据
+    """生成复盘推送：开奖复盘（复盘的是前一天开奖，不是今天预测）"""
+    # 先获取期号信息，用于标题
     rows = pick_latest_review(read_review_csv())
     if not rows:
-        parts.append("暂无复盘数据")
-        return "\n".join(parts)
+        return "\n".join([
+            f"📊 开奖复盘｜推送日 {today_str()}",
+            "",
+            "暂无复盘数据",
+        ])
+
+    # 提取各彩种复盘期号
+    review_issues = {}
+    for row in rows:
+        lotto = row.get("彩种", "")
+        issue = row.get("期号", "")
+        if lotto and issue:
+            review_issues[lotto] = issue
+
+    pls_issue = review_issues.get("排列三", "?")
+    d3_issue = review_issues.get("福彩3D", "?")
+
+    parts = [
+        f"📊 开奖复盘｜推送日 {today_str()}",
+        f"复盘对象：排列三 {pls_issue} / 福彩3D {d3_issue}",
+        f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
+        "",
+    ]
 
     # 按彩种分组获取今日实际开奖和命中情况
     grouped: dict[str, list] = {}
@@ -805,7 +821,7 @@ def build_kl8_review_message() -> str:
     pred = read_json(KL8_OUTPUT_DIR / "kl8_predict_latest.json")
     data = read_json(KL8_OUTPUT_DIR / "kl8_review_latest.json")
     if not data:
-        return "📊 快乐8复盘\n暂无复盘数据"
+        return "📊 快乐8开奖复盘\n暂无复盘数据"
 
     # 闸门：复盘期号必须等于预测期号，否则不推送（防止旧复盘被误推）
     target = str(pred.get("predicted_issue", ""))
@@ -1299,6 +1315,26 @@ def main():
             sys.exit(0)
         report_path = PUSH_DIR / f"{kind}_report.md"
         write_file(report_path, text)
+
+        # 复盘报告按期号归档（避免日期覆盖导致旧复盘丢失）
+        if kind == "review" and lottery in ("pls", "d3", "all"):
+            try:
+                rows = pick_latest_review(read_review_csv())
+                issues = {}
+                for row in rows:
+                    lotto = row.get("彩种", "")
+                    issue = row.get("期号", "")
+                    if lotto and issue:
+                        issues[lotto] = issue
+                pls_i = issues.get("排列三", "unknown")
+                d3_i = issues.get("福彩3D", "unknown")
+                archive_dir = PUSH_DIR / "reviews" / today_str()
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                archive_path = archive_dir / f"review_pls{pls_i}_d3{d3_i}.md"
+                write_file(archive_path, text)
+            except Exception:
+                pass  # 归档失败不阻塞推送
+
         h = msg_hash(text)
         # 去重：业务键优先
         if not args.force:
