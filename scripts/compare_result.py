@@ -165,6 +165,8 @@ def build_report(pred_json, actual, rows):
         '彩种': pred_json.get('彩种', ''),
         '预测期号': pred_json.get('预测期号', ''),
         '实际期号': actual['期号'],
+        '期号': actual['期号'],
+        '开奖期号': actual['期号'],
         '预测期号匹配': pred_json.get('预测期号') == actual['期号'],
         '开奖号码': actual['开奖号码'],
         '开奖详情': {

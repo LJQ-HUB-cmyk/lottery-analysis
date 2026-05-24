@@ -108,6 +108,25 @@ def check_lottery_ready(lottery: str, start_ts: float = None) -> tuple[bool, str
     return True, ""
 
 
+def extract_actual_issue(data: dict) -> str:
+    """
+    从 compare_latest.json 中提取实际开奖期号。
+    优先级：实际期号 > 期号 > 开奖期号 > 预测期号（仅期号匹配时兜底）。
+    """
+    if not data:
+        return ""
+    for key in ("实际期号", "期号", "开奖期号"):
+        value = data.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    # 最后兜底：预测期号匹配时才可以用预测期号
+    if data.get("预测期号匹配") is True:
+        value = data.get("预测期号")
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
 def main():
     from scripts.lib.job_status import write, READY, SKIPPED_WAITING, SKIPPED_ALREADY_SENT, ERROR
 
@@ -156,7 +175,7 @@ def main():
             r, msg = check_lottery_ready(lt, start_ts)
             ready_map[lt] = (r, msg)
             data = read_json(REPORT_DIR / f"{lt}_compare_latest.json")
-            issue = str(data.get("期号", "") or data.get("开奖期号", ""))
+            issue = extract_actual_issue(data)
             issues[lt] = issue
         status["issues"] = issues
 
@@ -173,6 +192,18 @@ def main():
             write(task_name, status)
             print(f"[OK] prepare-only 完成，{status['reason']}", file=sys.stderr)
             sys.exit(0)
+
+        # ── Step 2.5: 期号空校验 —— 已就绪的彩种必须能提取实际期号 ──
+        if not args.prepare_only:
+            for lt in targets:
+                if ready_map[lt][0] and not issues.get(lt):
+                    status["status"] = ERROR
+                    status["ok"] = False
+                    status["should_push"] = False
+                    status["reason"] = f"{lt} compare 已就绪，但无法提取实际期号，禁止生成空期号 dedup_key"
+                    write(task_name, status)
+                    print(f"[ERROR] {status['reason']}", file=sys.stderr)
+                    sys.exit(2)
 
         # ── Step 3: 构建 dedup_key（单彩种）──
         if args.lottery == "pls":
