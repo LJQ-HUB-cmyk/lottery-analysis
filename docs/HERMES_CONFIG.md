@@ -1,7 +1,7 @@
 # Hermes 定时任务配置
 
 > 此文件供 Hermes 读取并自动配置定时任务。修改此文件后，同步至 Hermes 平台生效。
-> 最后更新：2026-05-22（v2.15.0：Job 架构改造 — shell 薄入口 + Python job 业务逻辑 + dedup_key 去重 + status.json）
+> 最后更新：2026-05-24（v2.16.0：单彩种独立推送 + 包装脚本直接调 Python job）
 
 ---
 
@@ -23,13 +23,13 @@ FEISHU_WEBHOOK_URL = （你的飞书机器人 webhook 地址）
 cron_mode = allow
 ```
 
-### 三、定时任务（7 个任务）
+### 三、定时任务（8 个任务）
 
 > 所有推送类任务均为 no_agent=true 模式，绕过安全审批链。
-> Shell 脚本为薄入口，调用 Python job 负责业务逻辑。
-> 晚间复盘改为单彩种独立推送：22:05 拉数据 → 22:10 PLS → 22:15 D3 → 22:20 KL8。
+> Hermes cron 包装脚本直接调用 Python job（`~/.hermes/scripts/*.sh`），不经过 `scripts/push/` 下的 shell 薄入口。
+> 晚间复盘单彩种独立推送：22:05 准备数据 → 22:10 PLS → 22:15 D3 → 22:20 KL8。
 > 每条推送自带 `--final` 兜底（数据不齐时推送"无法复盘"通知）。
-> 修改项目 `scripts/push/` 后须手动 `cp` 到 `~/.hermes/scripts/`（软链接被 Hermes 拦截）。
+> 去重按彩种拆分：PLS/D3 各自独立 dedup_key，互不干扰。
 
 ```
 # ── 下午预测链路（14:40 单一入口）──
@@ -42,11 +42,11 @@ deliver = origin
 no_agent = true
 description = 排列三/福彩3D：下午预测生成并推送（自闭环：Job → run_daily → source_health → hermes_push）
 
-# ── 晚间复盘链路（22:05 拉取 → 22:10/22:15/22:20 单彩种独立推送）──
+# ── 晚间复盘链路（22:05 准备 → 22:10/22:15/22:20 单彩种独立推送）──
 
 [task-review-prepare-2205]
 cron = 05 22 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --prepare-only
+command = bash ~/.hermes/scripts/lottery_review_prepare.sh
 on_failure = continue
 deliver = local
 no_agent = true
@@ -54,7 +54,7 @@ description = 排列三/福彩3D：拉取开奖并生成复盘数据（不推送
 
 [task-review-pls-2210]
 cron = 10 22 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --lottery pls --final
+command = bash ~/.hermes/scripts/lottery_review_pls.sh
 on_failure = continue
 deliver = origin
 no_agent = true
@@ -62,7 +62,7 @@ description = 排列三单独复盘推送（带Top30）；数据已齐推完整�
 
 [task-review-d3-2215]
 cron = 15 22 * * *
-command = cd /home/admin/bendi/lottery-analysis && bash scripts/push/lottery_review_push.sh --lottery d3 --final
+command = bash ~/.hermes/scripts/lottery_review_d3.sh
 on_failure = continue
 deliver = origin
 no_agent = true
