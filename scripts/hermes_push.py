@@ -111,28 +111,7 @@ def read_review_csv() -> list[dict[str, str]]:
         return []
 
 
-def calc_sum(nums: str) -> int:
-    """从号码字符串计算和值（如 '835' → 16）"""
-    digits = [int(c) for c in nums if c.isdigit()]
-    return sum(digits) if len(digits) == 3 else 0
-
-
-def calc_span(nums: str) -> int:
-    """从号码字符串计算跨度（如 '835' → 5）"""
-    digits = [int(c) for c in nums if c.isdigit()]
-    return max(digits) - min(digits) if len(digits) == 3 else 0
-
-
-def calc_pattern(nums: str) -> str:
-    """从号码字符串判断形态：豹子/组三/组六"""
-    digits = [int(c) for c in nums if c.isdigit()]
-    if len(digits) != 3:
-        return "未知"
-    if digits[0] == digits[1] == digits[2]:
-        return "豹子"
-    if digits[0] == digits[1] or digits[1] == digits[2] or digits[0] == digits[2]:
-        return "组三"
-    return "组六"
+# calc_sum / calc_span / calc_shape 定义在下方工具函数区（约 L401 行）
 
 
 def parse_bool(val: str) -> bool:
@@ -214,7 +193,7 @@ def format_review_section() -> str:
 
     for (lottery, issue), items in sorted(grouped.items()):
         actual = items[0].get("开奖号码", "未知")
-        pattern = calc_pattern(actual)
+        pattern = calc_shape(actual)
         total = calc_sum(actual)
         span = calc_span(actual)
 
@@ -381,6 +360,89 @@ def format_group_review(recommends: list, draw: str) -> str:
     icon5 = "✅" if hit5 else f"❌ (缺{''.join(miss5)})"
     icon6 = "✅" if hit6 else f"❌ (缺{''.join(miss6)})"
     return f"五码 {five} {icon5} | 六码 {six} {icon6}"
+
+
+# ── 展示工具 ────────────────────────────────────────
+
+def normalize_strategy_name(name: str) -> str:
+    """统一策略展示名称。"""
+    mapping = {"默认": "标准", "default": "标准", "standard": "标准",
+               "稳健": "稳健", "conservative": "稳健",
+               "多样性": "多样性", "diversity": "多样性",
+               "auto_tuned": "自动调参"}
+    return mapping.get(name, name)
+
+
+def _digits_of(num):
+    return [int(x) for x in str(num).zfill(3)]
+
+
+def calc_sum(num):
+    return sum(_digits_of(num))
+
+
+def calc_span(num):
+    ds = _digits_of(num)
+    return max(ds) - min(ds)
+
+
+def calc_shape(num):
+    ds = _digits_of(num)
+    u = len(set(ds))
+    if u == 1:
+        return "豹子"
+    if u == 2:
+        return "组三"
+    return "组六"
+
+
+def calc_diff_metrics(pred_num, actual_num):
+    return {
+        "sum_diff": abs(calc_sum(pred_num) - calc_sum(actual_num)),
+        "span_diff": abs(calc_span(pred_num) - calc_span(actual_num)),
+        "shape_same": calc_shape(pred_num) == calc_shape(actual_num),
+    }
+
+
+def format_metrics(pred_num, actual_num):
+    m = calc_diff_metrics(pred_num, actual_num)
+    return (f"和值差{m['sum_diff']}｜跨度差{m['span_diff']}｜"
+            f"形态{'一致' if m['shape_same'] else '不一致'}")
+
+
+def format_number_grid(numbers, limit=None, line_size=5):
+    """号码网格：每行5个，无编号。"""
+    if not numbers:
+        return "-"
+    if limit is not None:
+        numbers = numbers[:limit]
+    clean = [str(x).zfill(3) for x in numbers]
+    lines = []
+    for i in range(0, len(clean), line_size):
+        lines.append(" ".join(clean[i:i + line_size]))
+    return "\n".join(lines)
+
+
+def missing_digits_from_pool(actual_num, pool):
+    actual_set = set(str(actual_num).zfill(3))
+    pool_set = set(str(pool))
+    return sorted(actual_set - pool_set)
+
+
+def format_group_review_new(recommends, draw):
+    """组选池展示 v2：每行一个池，清晰标注缺失数字。"""
+    five = top_digits(recommends, 5)
+    six = top_digits(recommends, 6)
+    if not five or not six:
+        return ""
+    lines = ["组选池："]
+    for label, pool in [("五码", five), ("六码", six)]:
+        missing = missing_digits_from_pool(draw, pool)
+        if missing:
+            lines.append(f"{label} {pool} ❌ 缺数字{''.join(missing)}")
+        else:
+            lines.append(f"{label} {pool} ✅ 覆盖")
+    return "\n".join(lines)
 
 
 def load_stats_cache(lottery: str) -> dict:
@@ -603,18 +665,24 @@ def is_recent(path: Path, hours: int = 12) -> bool:
     return (time.time() - path.stat().st_mtime) <= hours * 3600
 
 
-def format_health_section() -> str:
-    """优先读 source_health.json，fallback 到 source_status.json"""
+def format_health_section(override_issues=None) -> str:
+    """数据源状态。override_issues 可传入本次复盘的期号/号码。"""
     health_path = REPORT_DIR / "source_health.json"
+    override_issues = override_issues or {}
 
     if is_recent(health_path):
         data = read_json(health_path)
         if data:
             lines = ["【数据源状态】"]
             for lottery, label in [("pls", "排列三"), ("d3", "福彩3D")]:
-                d = data.get(lottery, {}).get("data")
-                if d and "error" not in d:
-                    lines.append(f"  {label}: 最新 {d['issue']}={d['number']} ({d['total_rows']}期)")
+                # 优先使用本次复盘数据
+                override = override_issues.get(lottery, {})
+                if override:
+                    lines.append(f"  {label}：已拉取 {override.get('issue','?')}={override.get('number','?')}")
+                else:
+                    d = data.get(lottery, {}).get("data")
+                    if d and "error" not in d:
+                        lines.append(f"  {label}: 最新 {d['issue']}={d['number']} ({d['total_rows']}期)")
                 for src_name, s in data.get(lottery, {}).get("sources", {}).items():
                     cd = s.get("cooldown_until")
                     fails = s.get("failures", 0)
@@ -706,6 +774,10 @@ def build_review_performance() -> str:
 
     parts = ["━━━━━━━━━━━━━━\n三、近期策略表现\n━━━━━━━━━━━━━━"]
     label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性", "auto_tuned": "自动调参"}
+    # 统一"默认"→"标准"
+    for i, row in enumerate(rows):
+        if row.get("策略", "") == "默认":
+            rows[i]["策略"] = "标准"
 
     for lotto in ["排列三", "福彩3D"]:
         parts.append(f"\n【{lotto}】")
@@ -784,16 +856,16 @@ def build_review_message(lottery_filter: str = "all") -> str:
         issue = review_issues.get(label, "?")
         parts = [
             f"📊 开奖复盘｜{label}｜推送日 {today_str()}",
-            f"复盘对象：{label} {issue}",
-            f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
+            f"复盘对象：{label} {issue}期预测数据",
+            f"说明：已按 {issue}期开奖结果完成复盘。",
             "",
         ]
     else:
         wanted = ["排列三", "福彩3D"]
         parts = [
             f"📊 开奖复盘｜推送日 {today_str()}",
-            f"复盘对象：排列三 {pls_issue} / 福彩3D {d3_issue}",
-            f"（注：复盘的是上一轮开奖，非今日下午预测期号）",
+            f"复盘对象：排列三 {pls_issue}期 / 福彩3D {d3_issue}期预测数据",
+            f"说明：已按对应期号开奖结果完成复盘。",
             "",
         ]
 
@@ -809,7 +881,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
             continue
         actual = items[0].get("开奖号码", "未知")
         review_issue = items[0].get("期号", "未知")
-        pattern = calc_pattern(actual)
+        pattern = calc_shape(actual)
         total = calc_sum(actual)
         span = calc_span(actual)
 
@@ -821,72 +893,152 @@ def build_review_message(lottery_filter: str = "all") -> str:
 
         lottery_key = "pls" if lotto == "排列三" else "d3"
 
-        # 各策略对比
-        default_recommends = []  # 用于组选展示
+        # 各策略对比 — 收集结果用于后续统一展示
+        strategy_results = []
+        default_recommends = []
+        has_any_hit = False
+
         for st_key, label in [("default", "默认"), ("conservative", "稳健"),
                                ("diversity", "多样性"), ("auto_tuned", "自动调参")]:
             item = next((r for r in items if r.get("策略", "") == st_key), None)
             if not item:
                 continue
 
-            # 按期号读对应预测文件，fallback latest 需校验期号
+            # 读取预测文件
             issue_digits = "".join(c for c in review_issue if c.isdigit())
             prefix = f"{lottery_key}_{st_key}" if st_key != "default" else lottery_key
             issue_pred_path = PRED_DIR / f"{prefix}_predict_{issue_digits}.json"
             if issue_pred_path.exists():
                 st_data = read_json(issue_pred_path)
             else:
-                # fallback 到 latest，但必须期号匹配，否则跳过策略详情
                 st_data = read_json(PRED_DIR / f"latest_{prefix}.json")
                 if st_data:
                     pred_issue = str(st_data.get("预测期号", ""))
                     actual_issue = "".join(c for c in pred_issue if c.isdigit())
                     if actual_issue != issue_digits:
-                        st_data = {}  # 期号不匹配，不展示该策略详情
+                        st_data = {}
             top30 = extract_topn(st_data, 30) if st_data else []
 
-            # 保存默认策略推荐用于五码/六码组选
             if st_key == "default" and st_data:
                 default_recommends = st_data.get("推荐", [])
 
             direct_hit = parse_bool(item.get("直选命中Top30", ""))
             group_hit = parse_bool(item.get("组选命中Top30", ""))
-            sum_err = safe_int(item.get("Top1和值误差"), 99)
-            span_err = safe_int(item.get("Top1跨度误差"), 99)
-            form_ok = parse_bool(item.get("Top1形态一致", ""))
-
-            hit_range = item.get("命中范围", "")
-            hit_num = item.get("命中号码", "")
+            hit_num = str(item.get("命中号码", "")).zfill(3) if item.get("命中号码") else ""
             hit_rank = item.get("命中排名", "")
+            hit_range = item.get("命中范围", "")
+            display_name = normalize_strategy_name(label)
 
-            if direct_hit:
-                result_icon = "🎯"
-                result_text = f"{hit_range}直选命中  {hit_num}（第{hit_rank}名）"
-            elif group_hit:
-                result_icon = "✅"
-                result_text = f"{hit_range}组选命中  {hit_num}（第{hit_rank}名）"
+            top1 = top30[0] if top30 else ""
+
+            # 命中指标：命中时按命中号码算，未命中时按 Top1 算
+            if direct_hit and hit_num:
+                ref_num = hit_num
+                ref_label = f"命中项：{hit_num}｜"
+                has_any_hit = True
+            elif group_hit and hit_num:
+                ref_num = hit_num
+                ref_label = f"命中项：{hit_num}｜"
+                has_any_hit = True
             else:
-                result_icon = "❌"
-                result_text = f"未命中"
+                ref_num = top1
+                ref_label = ""
 
-            parts.append(f"{result_icon} {label}：{result_text}")
-            parts.append(f"  和值差{sum_err}｜跨度差{span_err}｜形态{'一致' if form_ok else '不一致'}")
-            parts.append("")
-            parts.append(f"  Top30预测：")
-            parts.append(format_ranked_numbers(top30))
+            ref_metrics = format_metrics(ref_num, actual)
+
+            # 策略结果行
+            if direct_hit:
+                parts.append(f"🎯 {display_name}：{hit_range}直选命中  {hit_num}（第{hit_rank}名）")
+            elif group_hit:
+                parts.append(f"✅ {display_name}：{hit_range}组选命中  {hit_num}（第{hit_rank}名）")
+            else:
+                parts.append(f"❌ {display_name}：未命中")
+
+            if ref_label:
+                parts.append(f"  {ref_label}{ref_metrics}")
+
+            # 命中时 Top1 作为参考
+            if (direct_hit or group_hit) and top1 and top1 != hit_num:
+                parts.append(f"  Top1参考：{top1}｜{format_metrics(top1, actual)}")
+
+            # 未命中时显示 Top1
+            if not direct_hit and not group_hit and top1:
+                parts.append(f"  Top1：{top1}｜{ref_metrics}")
+
             parts.append("")
 
-        # 五码/六码组选复盘
+            # 收集策略结果
+            hit_type = None
+            if direct_hit:
+                hit_type = "direct"
+            elif group_hit:
+                rng = str(hit_range)
+                if "Top5" in rng:
+                    hit_type = "group_top5"
+                elif "Top10" in rng:
+                    hit_type = "group_top10"
+                else:
+                    hit_type = "group_top30"
+
+            strategy_results.append({
+                "name": display_name,
+                "st_key": st_key,
+                "top30": top30,
+                "hit": bool(direct_hit or group_hit),
+                "hit_type": hit_type,
+                "hit_label": str(hit_range) if (direct_hit or group_hit) else None,
+                "hit_number": hit_num,
+                "rank": hit_rank,
+            })
+
+        # 五码/六码组选
         if default_recommends and actual and actual != "未知":
-            gr = format_group_review(default_recommends, actual)
-            if gr:
-                parts.append(f"组选池：{gr}")
+            gs = format_group_review_new(default_recommends, actual)
+            if gs:
+                parts.append(gs)
                 parts.append("")
+
+        # 命中/未命中 Top 展示
+        if has_any_hit:
+            # 选最佳命中策略展示 Top30
+            best = None
+            priority = {"direct": 0, "group_top5": 1, "group_top10": 2, "group_top30": 3}
+            for r in strategy_results:
+                if r["hit"]:
+                    s = priority.get(r["hit_type"], 99)
+                    if best is None or s < priority.get(best["hit_type"], 99):
+                        best = r
+            if best and best["top30"]:
+                parts.append("━━━━━━━━━━━━━━")
+                parts.append(f"命中策略 Top30｜{best['name']}")
+                parts.append("━━━━━━━━━━━━━━")
+                parts.append(format_number_grid(best["top30"], limit=30, line_size=5))
+                parts.append("")
+        else:
+            # 未命中：各策略展示 Top10
+            parts.append("━━━━━━━━━━━━━━")
+            parts.append("未命中策略 Top10参考")
+            parts.append("━━━━━━━━━━━━━━")
+            for r in strategy_results:
+                if r["top30"]:
+                    parts.append(f"{r['name']}：")
+                    parts.append(format_number_grid(r["top30"], limit=10, line_size=5))
+                    parts.append("")
+
+    # 数据源状态（传入本次复盘数据，避免显示旧期号）
+    override_issues = {}
+    for lotto in wanted:
+        items = grouped.get(lotto, [])
+        if items:
+            actual = items[0].get("开奖号码", "未知")
+            issue = items[0].get("期号", "未知")
+            lt_key = "pls" if lotto == "排列三" else "d3"
+            override_issues[lt_key] = {"issue": issue, "number": actual}
 
     # 近期表现
     parts.append(build_review_performance())
     parts.append("")
-    parts.append(format_health_section())
+    parts.append(format_health_section(override_issues))
     parts.append("")
     parts.append("⚠️ 彩票具有随机性，以上仅供数据分析与复盘参考，不构成投注建议。")
 
