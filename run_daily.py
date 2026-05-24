@@ -150,12 +150,17 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5, strategy='d
         'default':      {'weights': None,                    'name': ''},
         'conservative': {'weights': 'rules/scoring_weights_conservative.yaml', 'name': 'conservative'},
         'diversity':    {'weights': 'rules/scoring_weights_diversity.yaml',    'name': 'diversity'},
+        'auto_tuned':   {'weights': f'rules/scoring_weights_auto_{lottery}.yaml', 'name': 'auto_tuned'},
     }
 
-    strategies = [strategy] if strategy != 'all' else ['default', 'conservative', 'diversity']
+    strategies = [strategy] if strategy != 'all' else ['default', 'conservative', 'diversity', 'auto_tuned']
 
     for st in strategies:
         cfg = strategy_configs[st]
+        wpath = Path(cfg['weights']) if cfg['weights'] else None
+        if wpath and not wpath.exists():
+            print(f"  [SKIP] {st} 权重文件不存在: {wpath}", file=sys.stderr)
+            continue
         score_cmd = [py, "scripts/scoring_engine.py", "--lottery", lottery,
                      "--top-k", str(top_k), "--exclude-recent", str(exclude_recent)]
         if cfg['weights']:
@@ -189,9 +194,9 @@ def main():
                         help='推荐注数（默认30）')
     parser.add_argument('--exclude-recent', type=int, default=5,
                         help='排除近N期已出号码（默认5）')
-    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'all'],
+    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'all'],
                         default='default',
-                        help='评分策略：default/conservative/diversity/all（默认default）')
+                        help='评分策略：default/conservative/diversity/auto_tuned/all（默认default）')
     args = parser.parse_args()
 
     today = datetime.now().strftime('%Y-%m-%d %H:%M')
