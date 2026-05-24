@@ -337,6 +337,52 @@ def format_ranked_numbers(nums: list[str], per_line: int = 10) -> str:
     return "\n".join(lines)
 
 
+def top_digits(recommends: list, k: int = 5) -> str:
+    """从 Top30 推荐里统计数字频率，取前 k 个高频数字。"""
+    from collections import Counter
+    cnt = Counter()
+    for item in (recommends or [])[:30]:
+        num = item.get("号码", "") if isinstance(item, dict) else str(item)
+        for d in str(num).zfill(3):
+            if d.isdigit():
+                cnt[d] += 1
+    return "".join(d for d, _ in cnt.most_common(k))
+
+
+def check_group_hit(digits_pool: str, draw: str) -> tuple[bool, list[str]]:
+    """检查开奖号码是否全部落在数字池内。
+    返回 (hit, missing_digits)。"""
+    draw_set = set(str(draw).zfill(3))
+    pool_set = set(digits_pool)
+    missing = draw_set - pool_set
+    return len(missing) == 0, sorted(missing)
+
+
+def format_group_select(recommends: list) -> str:
+    """生成五码/六码组选展示文本（预测用）。"""
+    five = top_digits(recommends, 5)
+    six = top_digits(recommends, 6)
+    if not five or not six:
+        return ""
+    return (
+        f"五码组选：{five}（组六10注+组三20注=30注）\n"
+        f"六码组选：{six}（组六20注+组三30注=50注）"
+    )
+
+
+def format_group_review(recommends: list, draw: str) -> str:
+    """生成五码/六码复盘展示文本（复盘用）。"""
+    five = top_digits(recommends, 5)
+    six = top_digits(recommends, 6)
+    if not five or not six:
+        return ""
+    hit5, miss5 = check_group_hit(five, draw)
+    hit6, miss6 = check_group_hit(six, draw)
+    icon5 = "✅" if hit5 else f"❌ (缺{''.join(miss5)})"
+    icon6 = "✅" if hit6 else f"❌ (缺{''.join(miss6)})"
+    return f"五码 {five} {icon5} | 六码 {six} {icon6}"
+
+
 def load_stats_cache(lottery: str) -> dict:
     """加载统计缓存"""
     path = CACHE_DIR / f"{lottery}_stats_latest.json"
@@ -495,6 +541,12 @@ def format_prediction_section(lottery: str, label: str) -> str:
 
     if secondary:
         parts.append(f"\n备选关注：\n{' '.join(secondary[:5])}")
+
+    # 五码/六码组选
+    if recommends:
+        gs = format_group_select(recommends)
+        if gs:
+            parts.append(f"\n{gs}")
 
     return "\n".join(parts)
 
@@ -769,6 +821,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
         lottery_key = "pls" if lotto == "排列三" else "d3"
 
         # 各策略对比
+        default_recommends = []  # 用于组选展示
         for st_key, label in [("default", "默认"), ("conservative", "稳健"), ("diversity", "多样性")]:
             item = next((r for r in items if r.get("策略", "") == st_key), None)
             if not item:
@@ -789,6 +842,10 @@ def build_review_message(lottery_filter: str = "all") -> str:
                     if actual_issue != issue_digits:
                         st_data = {}  # 期号不匹配，不展示该策略详情
             top30 = extract_topn(st_data, 30) if st_data else []
+
+            # 保存默认策略推荐用于五码/六码组选
+            if st_key == "default" and st_data:
+                default_recommends = st_data.get("推荐", [])
 
             direct_hit = parse_bool(item.get("直选命中Top30", ""))
             group_hit = parse_bool(item.get("组选命中Top30", ""))
@@ -816,6 +873,13 @@ def build_review_message(lottery_filter: str = "all") -> str:
             parts.append(f"  Top30预测：")
             parts.append(format_ranked_numbers(top30))
             parts.append("")
+
+        # 五码/六码组选复盘
+        if default_recommends and actual and actual != "未知":
+            gr = format_group_review(default_recommends, actual)
+            if gr:
+                parts.append(f"组选池：{gr}")
+                parts.append("")
 
     # 近期表现
     parts.append(build_review_performance())
