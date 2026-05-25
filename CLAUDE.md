@@ -274,7 +274,7 @@ output/status/*.json（任务状态记录）
 4. **回归惩罚**：形态评分双向惩罚偏离理论值（过热降分、过冷加分）
 5. **多样性惩罚**：同组选只保留最高分直选 + 跨度多样性促进
 6. **遗漏评分上限截断**：`miss_score = max(0, min(miss_score, W['遗漏']))`，防止三热号场景遗漏分超过配置权重2倍（14/7）
-7. **期号不匹配分类处理**：`pred>actual` 标记 `waiting_actual`(exit 0)，写 `*_waiting.json` 不覆盖 latest；`pred<actual` 视为真错误(exit 1)
+7. **期号不匹配分类处理**：`pred>actual` 标记 `waiting_actual`(exit 0)，写 `*_waiting.json` 不覆盖 latest；`pred<actual` 视为真错误(exit 2)
 8. **复盘命中按范围分层**：review_history 记录 `命中范围(Top5/Top10/Top30)` + `命中号码` + `命中排名` + `Top5直选/组选`，hermes_push 复盘推送口径与预测一致，命中时展示具体号码和排名，Top5 标注为"参考"
 9. **不做 LSTM/ML 直接预测号码**：彩票无时间依赖，ML 不优于统计方法
 10. **快乐8独立模块不接入主流程**：`scripts/kl8/` 7个文件（fetcher/predictor/reviewer/check/metrics/stats/strategy），热号+冷号策略 + 选四主推 + 盈亏复盘 + 累计表现，与 PLS/D3 互不干扰。多策略框架已就绪，待 ≥30 天数据后回测评估
@@ -290,8 +290,8 @@ output/status/*.json（任务状态记录）
 > 以下为已知但暂不致命的问题。解决后打 ✅。
 
 - [ ] **js-lottery 排列三主源持续 fallback** — fallback 路径仅解析 10 条，影响历史数据完整性。建议采集失败响应样本到 `logs/source_samples/`
-- [ ] **21:35/22:05 推送记录缺失无法回溯** — send_log.jsonl 不会回溯写入历史记录，仅从 2026-05-20 23:31 修复后开始记录 len+preview
-- [ ] **push_state.json 不存在** — `--stdout + deliver=origin` 模式不创建 push_state.json（预期行为），该模式去重靠 send_log.jsonl + 文件锁
+- [x] **21:35/22:05 推送记录缺失无法回溯** — 已改为单彩种独立推送（22:10/22:15/22:20），旧三波补偿 cron 已删除
+- [x] **push_state.json 不存在** — `--stdout + deliver=origin` 模式不创建（预期行为），去重靠 dedup_key + send_log.jsonl
 
 ## 文件编码
 

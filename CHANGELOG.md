@@ -81,8 +81,8 @@
 ## v2.10.0 (2026-05-19)
 
 - **两段式推送**：hermes_push 新增 predict(预测)/review(复盘)两种模式，下午推预测、晚间推复盘
-- **compare_result 期号分类**：pred>actual → waiting_actual(exit 0，写 `*_waiting.json` 不覆盖 latest)；pred<actual 视为真错误(exit 1)
-- **build_review_message 重写**：从"昨日复盘"改为"今日预测 vs 开奖直接对比"
+- **compare_result 期号分类**：pred>actual → waiting_actual(exit 0，写 `*_waiting.json` 不覆盖 latest)；pred<actual 视为真错误(exit 2→v2.17 统一为 exit 2)
+- **build_review_message 重写**：从"昨日复盘"改为"今日预测 vs 开奖直接对比"（v2.16 已改为"开奖复盘｜推送日"）
 - **HERMES_CONFIG 6 cron job**：结构化配置清单，含故障恢复章节
 - **push_state.json**：每期推送状态记录，多轮 cron 不重复轰炸
 
