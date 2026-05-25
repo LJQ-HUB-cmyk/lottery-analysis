@@ -665,16 +665,21 @@ def is_recent(path: Path, hours: int = 12) -> bool:
     return (time.time() - path.stat().st_mtime) <= hours * 3600
 
 
-def format_health_section(override_issues=None) -> str:
-    """数据源状态。override_issues 可传入本次复盘的期号/号码。"""
+def format_health_section(override_issues=None, lottery_filter: str = "all") -> str:
+    """数据源状态。override_issues 可传入本次复盘的期号/号码。
+    lottery_filter: all=全部 / pls=只排列三 / d3=只福彩3D。"""
     health_path = REPORT_DIR / "source_health.json"
     override_issues = override_issues or {}
+
+    lotto_pairs = [("pls", "排列三"), ("d3", "福彩3D")]
+    if lottery_filter in ("pls", "d3"):
+        lotto_pairs = [(lottery_filter, "排列三" if lottery_filter == "pls" else "福彩3D")]
 
     if is_recent(health_path):
         data = read_json(health_path)
         if data:
             lines = ["【数据源状态】"]
-            for lottery, label in [("pls", "排列三"), ("d3", "福彩3D")]:
+            for lottery, label in lotto_pairs:
                 # 优先使用本次复盘数据
                 override = override_issues.get(lottery, {})
                 if override:
@@ -707,6 +712,8 @@ def format_health_section(override_issues=None) -> str:
 
     lines = ["【数据源状态】"]
     for name, item in data.items():
+        if lottery_filter in ("pls", "d3") and not name.startswith(lottery_filter):
+            continue
         cd = item.get("cooldown_until", "")
         fails = item.get("consecutive_failures", 0)
         if cd:
@@ -1042,7 +1049,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
     # 近期表现
     parts.append(build_review_performance(lottery_filter))
     parts.append("")
-    parts.append(format_health_section(override_issues))
+    parts.append(format_health_section(override_issues, lottery_filter))
     parts.append("")
     parts.append("⚠️ 彩票具有随机性，以上仅供数据分析与复盘参考，不构成投注建议。")
 
