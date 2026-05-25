@@ -146,7 +146,8 @@ def main():
     latest_path = DATA_DIR / "kl8_latest.json"
     if not latest_path.exists():
         print("[ERROR] 请先运行 kl8/fetcher.py", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(3)
+
     latest_data = json.loads(latest_path.read_text(encoding="utf-8"))
     latest_issue = latest_data["issue"]
 
@@ -154,7 +155,7 @@ def main():
         data = predict(latest_issue, pool_size=args.pool_size, hot_ratio=args.hot_ratio)
     except RuntimeError as e:
         print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
     path = save_prediction(data)
 
     pool = data["candidate_pool"]

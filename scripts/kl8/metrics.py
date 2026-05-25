@@ -60,7 +60,7 @@ def main():
         reader = csv.DictReader(f)
         if "结果" not in (reader.fieldnames or []):
             print("review_history 字段不完整，请先运行 reviewer.py")
-            sys.exit(1)
+            sys.exit(3)
         all_rows = list(reader)
 
     all_rows.sort(key=lambda r: r.get("期号", ""), reverse=True)

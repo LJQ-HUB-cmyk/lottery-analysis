@@ -69,7 +69,9 @@ def main():
 
     try:
         # ── Step 1: 拉取数据 ──
-        run(["scripts/kl8/fetcher.py", "--pages", "3"], "KL8 拉取数据")
+        ok_fetch = run(["scripts/kl8/fetcher.py", "--pages", "3"], "KL8 拉取数据")
+        if not ok_fetch:
+            print("[WARN] KL8 fetcher 返回非零，继续尝试预测...", file=sys.stderr)
 
         # ── Step 2: 生成预测 ──
         ok_pred = run(["scripts/kl8/predictor.py"], "KL8 生成预测")
@@ -93,6 +95,13 @@ def main():
             except Exception:
                 pass
         predicted_issue = str(pred_data.get("predicted_issue", "?"))
+        if predicted_issue == "?":
+            status["status"] = ERROR
+            status["ok"] = False
+            status["reason"] = "预测期号为空，无法生成 dedup_key"
+            print(f"[ERROR] {status['reason']}", file=sys.stderr)
+            write("kl8_predict", status)
+            sys.exit(2)
 
         status["dedup_key"] = f"kl8_predict:{predicted_issue}"
         status["should_push"] = True

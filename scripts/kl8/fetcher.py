@@ -155,14 +155,14 @@ def main():
         if warnings:
             for w in warnings:
                 print(w)
-            sys.exit(1)
+            sys.exit(2)
         print("✅ 数据完整性检查通过")
         sys.exit(0)
 
     rows = fetch_official(page_size=30, max_pages=args.pages)
     if not rows:
         print("[ERROR] 未抓取到任何数据", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
     hpath = save_history(rows)
     lpath = save_latest(rows[0])

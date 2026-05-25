@@ -147,7 +147,7 @@ def main():
 
     if not pred_path.exists():
         print(f"[ERROR] 预测文件不存在: {pred_path}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(3)
 
     pred = json.loads(pred_path.read_text(encoding="utf-8"))
 
