@@ -278,12 +278,24 @@ def main():
 
         # ── Step 5: 目标彩种齐全 → 正常复盘 ──
         if not daily_ok:
-            status["status"] = ERROR
-            status["ok"] = False
-            status["reason"] = "daily_review.py 执行异常"
-            print(f"[ERROR] {status['reason']}", file=sys.stderr)
-            write(task_name, status)
-            sys.exit(2)
+            # 不直接阻断：检查 compare 文件是否实际可用
+            compare_ok = True
+            for lt in targets:
+                path = REPORT_DIR / f"{lt}_compare_latest.json"
+                data = read_json(path)
+                if not data or data.get("错误"):
+                    compare_ok = False
+                    break
+            if compare_ok:
+                print(f"[WARN] daily_review 部分步骤失败，但 compare 数据已就绪，继续推送",
+                      file=sys.stderr)
+            else:
+                status["status"] = ERROR
+                status["ok"] = False
+                status["reason"] = "daily_review.py 执行异常，且 compare 数据未就绪"
+                print(f"[ERROR] {status['reason']}", file=sys.stderr)
+                write(task_name, status)
+                sys.exit(2)
 
         status["dedup_key"] = dedup_key
         status["should_push"] = True
