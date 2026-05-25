@@ -1,0 +1,69 @@
+meta:
+  generated_at: '2026-05-25 02:09:05'
+  lottery: pls
+  source: scripts/tune_scoring_params.py (Optuna)
+  note: 自动调参生成；建议先灰度观察7天再考虑替换默认策略。
+weights:
+  和值: 13
+  跨度: 25
+  形态: 6
+  奇偶: 10
+  大小: 10
+  012路: 6
+  冷热: 17
+  遗漏: 5
+  多样性: 11
+hot_cold:
+  cold_threshold: 10
+  hot_threshold: 6
+diversity:
+  group_penalty: 12
+  span_spread: 11
+overheat_decay:
+  high: 0.6901
+  medium: 0.6423
+runtime:
+  exclude_recent: 8
+  exclude_mode: group
+  include_baozi: false
+stability:
+  '50':
+    periods: 50
+    direct_hits: 1
+    direct_%: 2.0
+    group_hits: 10
+    group_%: 20.0
+    avg_sum_diff: 0.54
+    avg_span_diff: 0.72
+    shape_match_avg: 19.7
+    group_rank_avg: 19.3
+    max_miss: 7
+    objective: 19.605
+  '100':
+    periods: 100
+    direct_hits: 2
+    direct_%: 2.0
+    group_hits: 20
+    group_%: 20.0
+    avg_sum_diff: 0.51
+    avg_span_diff: 0.6
+    shape_match_avg: 19.84
+    group_rank_avg: 16.55
+    max_miss: 7
+    objective: 20.4015
+  '200':
+    periods: 200
+    direct_hits: 5
+    direct_%: 2.5
+    group_hits: 39
+    group_%: 19.5
+    avg_sum_diff: 0.63
+    avg_span_diff: 0.565
+    shape_match_avg: 19.08
+    group_rank_avg: 16.36
+    max_miss: 15
+    objective: 13.7042
+  pass: true
+  rules:
+    min_group_rate: 0.08
+    max_miss: 35

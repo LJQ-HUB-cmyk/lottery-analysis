@@ -1,0 +1,20 @@
+weights:
+  和值: 20
+  跨度: 11
+  形态: 14
+  奇偶: 8
+  大小: 8
+  012路: 7
+  冷热: 5
+  遗漏: 7
+  组三六偏向: 8
+  多样性: 5
+hot_cold:
+  cold_threshold: 5
+  hot_threshold: 3
+diversity:
+  group_penalty: 6
+  span_spread: 8
+overheat_decay:
+  high: 0.56
+  medium: 0.79

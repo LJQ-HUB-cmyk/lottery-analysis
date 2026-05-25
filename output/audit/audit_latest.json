@@ -1,0 +1,56 @@
+{
+  "pls": {
+    "lottery": "pls",
+    "ok": true,
+    "raw": {
+      "lottery": "pls",
+      "raw_path": "data/raw/pls_raw.csv",
+      "exists": true,
+      "errors": [],
+      "warnings": [
+        "存在空日期: 7591 行"
+      ],
+      "stats": {
+        "raw_rows": 7609,
+        "min_issue": 4001,
+        "max_issue": 26134,
+        "unique_issues": 7609
+      }
+    },
+    "processed": {
+      "processed_path": "data/processed/pls_feat.csv",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "stats": {
+        "processed_rows": 7609
+      }
+    }
+  },
+  "d3": {
+    "lottery": "d3",
+    "ok": true,
+    "raw": {
+      "lottery": "d3",
+      "raw_path": "data/raw/d3_raw.csv",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "stats": {
+        "raw_rows": 7641,
+        "min_issue": 2004001,
+        "max_issue": 2026134,
+        "unique_issues": 7641
+      }
+    },
+    "processed": {
+      "processed_path": "data/processed/d3_feat.csv",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "stats": {
+        "processed_rows": 7641
+      }
+    }
+  }
+}
