@@ -8,6 +8,8 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 from scripts.kl8.common import parse_kl8_numbers
 
 BASE = Path(__file__).resolve().parent.parent.parent

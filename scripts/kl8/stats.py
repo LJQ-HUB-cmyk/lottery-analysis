@@ -2,9 +2,12 @@
 """快乐8统计指标 —— 奇偶/大小/连号/和值/冷热/遗漏"""
 import csv
 import json
+import sys
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scripts.kl8.common import parse_kl8_numbers
 

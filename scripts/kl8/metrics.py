@@ -6,6 +6,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 BASE = Path(__file__).resolve().parent.parent.parent
 OUTPUT_DIR = BASE / "output" / "kl8"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

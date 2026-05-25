@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """快乐8多策略模块 —— 统一接口，便于回测对比"""
 import random
+import sys
 from collections import Counter
+from pathlib import Path
 from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def v0_random(pool_size: int = 4) -> list[int]:
