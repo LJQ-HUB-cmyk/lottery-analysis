@@ -157,6 +157,8 @@ def main():
         "started_at": now().strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
 
+    RETRY_DELAY = 120  # 延迟重试秒数
+
     try:
         # ── Step 1: 执行 daily_review.py ──
         start_ts = time.time()
@@ -181,10 +183,51 @@ def main():
 
         selected_ready = all(ready_map[k][0] for k in targets)
 
-        # ── Step 2.5: prepare-only 模式 ──
+        # ── Step 2.5: prepare-only 模式（含延迟重试）──
         if args.prepare_only:
+            # 延迟重试：对处于 waiting_actual（预测期号>实际期号）的彩种
+            # 等待后重新拉取数据和特征工程，给数据源多一次机会更新
+            retried = False
+            retry_targets = [
+                k for k in targets
+                if not ready_map[k][0] and "等待开奖" in ready_map[k][1]
+            ]
+            if retry_targets:
+                print(
+                    f"[RETRY] {'、'.join(retry_targets)} 仍在等待开奖，"
+                    f"等待 {RETRY_DELAY}s 后重试...",
+                    file=sys.stderr,
+                )
+                time.sleep(RETRY_DELAY)
+                print(f"[RETRY] 重新拉取数据...", file=sys.stderr)
+                run(["scripts/data_fetcher.py", "--all"], "延迟后重新拉取数据", timeout=300)
+                # 重新跑 daily_review 全流程（特征工程+对比+摘要）
+                run(daily_cmd, "延迟后重新复盘", timeout=600)
+                # 重新检查
+                retry_start_ts = time.time()
+                ready_map = {}
+                issues = {}
+                for lt in targets:
+                    r, msg = check_lottery_ready(lt, retry_start_ts)
+                    ready_map[lt] = (r, msg)
+                    data = read_json(REPORT_DIR / f"{lt}_compare_latest.json")
+                    issue = extract_actual_issue(data)
+                    issues[lt] = issue
+                selected_ready = all(ready_map[k][0] for k in targets)
+                retried = True
+
             status["should_push"] = False
-            status["reason"] = "prepare-only：已完成开奖拉取和复盘准备，不推送"
+            if retried:
+                if selected_ready:
+                    status["reason"] = (
+                        "prepare-only：延迟重试后数据已就绪，复盘准备完成"
+                    )
+                else:
+                    status["reason"] = (
+                        "prepare-only：延迟重试后仍未齐，等待后续独立任务处理"
+                    )
+            else:
+                status["reason"] = "prepare-only：已完成开奖拉取和复盘准备，不推送"
             status["finished_at"] = now().strftime("%Y-%m-%dT%H:%M:%S%z")
             if not selected_ready:
                 missing = [f"{k}({ready_map[k][1]})" for k in targets if not ready_map[k][0]]
