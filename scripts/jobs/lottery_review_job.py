@@ -158,6 +158,7 @@ def main():
     }
 
     RETRY_DELAY = 120  # 延迟重试秒数
+    D3_RETRY_WAIT = 90  # D3 数据源更新延迟重试秒数
 
     try:
         # ── Step 1: 执行 daily_review.py ──
@@ -182,6 +183,40 @@ def main():
         status["issues"] = issues
 
         selected_ready = all(ready_map[k][0] for k in targets)
+
+        # ── Step 2.1: D3 数据源延迟重试（非 prepare-only 模式）──
+        # 东方财富的 D3 历史列表有时开奖后几分钟才更新 2026141 期数据
+        # prepare-only 模式已含有重试（Step 2.5），此处只处理独立推送模式
+        if not selected_ready and args.lottery == "d3" and not args.prepare_only:
+            d3_ready, d3_msg = ready_map.get("d3", (False, ""))
+            if not d3_ready and "等待开奖" in d3_msg:
+                print(
+                    f"[D3 RETRY] 福彩3D 开奖数据尚未就绪，"
+                    f"等待 {D3_RETRY_WAIT}s 后重试...",
+                    file=sys.stderr,
+                )
+                time.sleep(D3_RETRY_WAIT)
+                print(f"[D3 RETRY] 重新拉取数据...", file=sys.stderr)
+                run(["scripts/data_fetcher.py", "--lottery", "d3"],
+                    "延迟后重新拉取 D3 数据", timeout=300)
+                # 重新跑 daily_review 全流程（特征工程+对比+摘要）
+                run(daily_cmd, "延迟后重新复盘", timeout=600)
+                # 重新检查
+                retry_start_ts = time.time()
+                ready_map = {}
+                issues = {}
+                for lt in targets:
+                    r, msg = check_lottery_ready(lt, retry_start_ts)
+                    ready_map[lt] = (r, msg)
+                    data = read_json(REPORT_DIR / f"{lt}_compare_latest.json")
+                    issue = extract_actual_issue(data)
+                    issues[lt] = issue
+                status["issues"] = issues
+                selected_ready = all(ready_map[k][0] for k in targets)
+                if selected_ready:
+                    print(f"[D3 RETRY] ✅ 重试后数据已就绪", file=sys.stderr)
+                else:
+                    print(f"[D3 RETRY] ⚠️ 重试后仍未就绪，按原流程处理", file=sys.stderr)
 
         # ── Step 2.5: prepare-only 模式（含延迟重试）──
         if args.prepare_only:

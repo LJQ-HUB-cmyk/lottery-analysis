@@ -2,40 +2,40 @@
   "lottery": "kl8",
   "strategy": "kl8_v1_hot12_cold8",
   "last7": {
-    "days": 5,
-    "total_cost": 10,
-    "total_prize": 5,
-    "total_profit": -5,
+    "days": 7,
+    "total_cost": 14,
+    "total_prize": 0,
+    "total_profit": -14,
     "hit2_count": 0,
-    "hit3_count": 1,
+    "hit3_count": 0,
     "hit4_count": 0,
-    "hit_rate": 0.2,
-    "avg_pool_hit": 6.2,
-    "max_miss_streak": 4
+    "hit_rate": 0.0,
+    "avg_pool_hit": 4.57,
+    "max_miss_streak": 7
   },
   "last30": {
-    "days": 5,
-    "total_cost": 10,
+    "days": 11,
+    "total_cost": 22,
     "total_prize": 5,
-    "total_profit": -5,
+    "total_profit": -17,
     "hit2_count": 0,
     "hit3_count": 1,
     "hit4_count": 0,
-    "hit_rate": 0.2,
-    "avg_pool_hit": 6.2,
-    "max_miss_streak": 4
+    "hit_rate": 0.0909,
+    "avg_pool_hit": 5.36,
+    "max_miss_streak": 10
   },
   "all": {
-    "days": 5,
-    "total_cost": 10,
+    "days": 11,
+    "total_cost": 22,
     "total_prize": 5,
-    "total_profit": -5,
+    "total_profit": -17,
     "hit2_count": 0,
     "hit3_count": 1,
     "hit4_count": 0,
-    "hit_rate": 0.2,
-    "avg_pool_hit": 6.2,
-    "max_miss_streak": 4
+    "hit_rate": 0.0909,
+    "avg_pool_hit": 5.36,
+    "max_miss_streak": 10
   },
-  "updated_at": "2026-05-25 22:20:15"
+  "updated_at": "2026-05-31 22:20:08"
 }
