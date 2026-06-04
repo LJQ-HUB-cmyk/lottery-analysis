@@ -185,6 +185,14 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5, strategy='d
     except ImportError:
         logger.info(f"   ℹ️ {label} 可视化跳过（matplotlib未安装）")
 
+    # 6. 策略融合（共识投票加权，生成 ensemble 预测）
+    if strategy == 'all':
+        run_cmd(
+            [py, "scripts/build_ensemble_predictions.py", "--lottery", lottery],
+            f"{label} 策略融合 [ensemble]",
+            timeout=60,
+        )
+
 
 def main():
     parser = argparse.ArgumentParser(description='彩票分析每日一键运行')

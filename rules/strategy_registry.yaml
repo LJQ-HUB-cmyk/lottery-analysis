@@ -1,0 +1,50 @@
+# 策略注册表 — 控制哪些策略参与预测和融合
+# 修改此文件后下次预测自动生效，无需改代码
+
+strategies:
+  default:
+    enabled: true
+    push: true
+    weight: 0.30
+    type: rule
+    description: 默认权重评分
+
+  conservative:
+    enabled: true
+    push: true
+    weight: 0.20
+    type: rule
+    description: 稳健策略（低风险偏好）
+
+  diversity:
+    enabled: true
+    push: true
+    weight: 0.15
+    type: rule
+    description: 多样性策略（跨度分散）
+
+  auto_tuned:
+    enabled: true
+    push: true
+    weight: 0.25
+    type: rule
+    description: Optuna 自动调参策略
+
+  ml_model:
+    enabled: false
+    push: false
+    weight: 0.10
+    type: ml
+    description: 外部 ML 模型（暂未接入）
+
+  ensemble:
+    enabled: true
+    push: true
+    weight: null
+    type: fusion
+    description: 加权融合策略（默认+稳健+多样+auto_tuned 共识投票）
+
+fusion:
+  consensus_bonus: 1.1       # 3+策略共识加成
+  dual_select_bonus: 1.05    # auto_tuned + default 双选中加成
+  min_strategies: 2          # 至少几个策略选中才纳入候选

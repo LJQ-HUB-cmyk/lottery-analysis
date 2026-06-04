@@ -535,7 +535,8 @@ def format_prediction_section(lottery: str, label: str) -> str:
     # 三策略共振
     consensus_nums: dict[str, int] = {}
     for suffix, sname in [("", "default"), ("_conservative", "稳健"),
-                           ("_diversity", "多样性"), ("_auto_tuned", "自动调参")]:
+                           ("_diversity", "多样性"), ("_auto_tuned", "自动调参"),
+                           ("_ensemble", "融合策略")]:
         sp = PRED_DIR / f"latest_{lottery}{suffix}.json"
         sd = read_json(sp)
         if sd:
@@ -781,7 +782,8 @@ def build_review_performance(lottery_filter: str = "all") -> str:
         lottery_data.setdefault(lotto, {}).setdefault(st, []).append(row)
 
     parts = ["━━━━━━━━━━━━━━\n三、近期策略表现\n━━━━━━━━━━━━━━"]
-    label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性", "auto_tuned": "自动调参"}
+    label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性",
+                 "auto_tuned": "自动调参", "ensemble": "融合策略"}
     # 统一"默认"→"标准"
     for i, row in enumerate(rows):
         if row.get("策略", "") == "默认":
@@ -792,7 +794,7 @@ def build_review_performance(lottery_filter: str = "all") -> str:
 
     for lotto in wanted:
         parts.append(f"\n【{lotto}】")
-        for st in ["default", "conservative", "diversity", "auto_tuned"]:
+        for st in ["default", "conservative", "diversity", "auto_tuned", "ensemble"]:
             records = lottery_data.get(lotto, {}).get(st, [])
             if not records:
                 continue
@@ -910,7 +912,8 @@ def build_review_message(lottery_filter: str = "all") -> str:
         has_any_hit = False
 
         for st_key, label in [("default", "默认"), ("conservative", "稳健"),
-                               ("diversity", "多样性"), ("auto_tuned", "自动调参")]:
+                               ("diversity", "多样性"), ("auto_tuned", "自动调参"),
+                               ("ensemble", "融合策略")]:
             item = next((r for r in items if r.get("策略", "") == st_key), None)
             if not item:
                 continue

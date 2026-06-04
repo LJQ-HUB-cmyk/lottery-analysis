@@ -85,7 +85,7 @@ def main():
         prefix_map = {'pls': 'pls', 'd3': 'd3'}
         lt_prefix = prefix_map.get(lt, lt)
         available = []
-        for st in ['default', 'conservative', 'diversity', 'auto_tuned']:
+        for st in ['default', 'conservative', 'diversity', 'auto_tuned', 'ensemble']:
             suffix = "" if st == "default" else f"_{st}"
             pred_file = PRED_DIR / f"latest_{lt_prefix}{suffix}.json"
             if pred_file.exists():

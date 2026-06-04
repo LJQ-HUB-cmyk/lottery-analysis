@@ -336,7 +336,7 @@ def main():
                         help='彩种')
     parser.add_argument('--prediction', help='预测JSON路径（默认 latest）')
     parser.add_argument('--strategy', default='default',
-                        choices=['default', 'conservative', 'diversity', 'auto_tuned'],
+                        choices=['default', 'conservative', 'diversity', 'auto_tuned', 'ensemble'],
                         help='策略名称（默认default，用于加载对应预测文件）')
     args = parser.parse_args()
 
