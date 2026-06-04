@@ -59,7 +59,7 @@ lottery-analysis/
 │   ├── compare_result.py     # 预测 vs 开奖对比 + review_history累加
 │   ├── review_summary.py     # 最近N期复盘表现摘要
 │   ├── daily_review.py       # 每日复盘一键脚本（Hermes cron调用）
-│   ├── tune_weights.py       # 权重自动调优（随机搜索 + Optuna贝叶斯优化 + 稳定性分析）
+│   ├── tune_weights.py       # 旧版权重调优（已升级为 tune_scoring_params.py）
 │   ├── filter_engine.py      # 轻量预过滤（已降级）
 │   ├── visualize.py          # 走势图/热力图（matplotlib + plotly）
 │   ├── issue_utils.py         # 期号标准化（PLS/D3格式互转）
@@ -227,8 +227,8 @@ python scripts/issue_utils.py                            # 自测
 ### 权重调优（需 review_history ≥ 15 期）
 
 ```bash
-python scripts/tune_weights.py --lottery pls --trials 30 --periods 50
-python scripts/tune_weights.py --lottery pls --method optuna --trials 30
+python scripts/tune_scoring_params.py --lottery pls --trials 80 --periods 120
+python scripts/tune_scoring_params.py --lottery d3 --trials 80 --periods 120
 ```
 
 ### 可视化

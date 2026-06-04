@@ -70,7 +70,7 @@ lottery-analysis/
 │   ├── compare_result.py         # 预测 vs 开奖对比 + review_history累加
 │   ├── review_summary.py         # 最近N期复盘表现摘要
 │   ├── daily_review.py           # 每日复盘一键脚本（Hermes cron调用）
-│   ├── tune_weights.py           # 权重自动调优（随机搜索 + Optuna贝叶斯优化 + 稳定性分析）
+│   ├── tune_weights.py           # 权重自动调优（已升级为 tune_scoring_params.py）
 │   ├── filter_engine.py          # 轻量预过滤（已降级）
 │   ├── visualize.py              # 走势图/热力图（matplotlib + plotly）
 │   ├── issue_utils.py            # 期号标准化（PLS/D3格式互转）
@@ -160,7 +160,7 @@ lottery-analysis/
 
 ## 后续计划
 
-- [ ] 评分权重系统调优（等待 review_history.csv 积累 30 期数据后运行 tune_weights.py）
+- [x] 评分权重系统调优 — 已升级为 `tune_scoring_params.py`（Optuna walk-forward），auto_tuned 灰度运行中
 - [ ] 遗漏计算真正向量化（去除 Python for 循环，当前 7600 行性能足够）
 - [ ] GitHub Actions 每日自动运行（可选）
 
@@ -365,7 +365,7 @@ python scripts/hermes_push.py --mode review --lottery kl8
 ## 已知问题与限制
 
 - 🟢 **福彩3D自动拉取**：eastmoney.com 主源自动获取数据，已验证可用；zhcw.com 保留为备用校验源
-- 🟡 **评分权重待调优**：tune_weights.py 已就绪（随机搜索 + Optuna 贝叶斯优化），等待复盘数据积累
+- ✅ **评分权重已调优**：`tune_scoring_params.py`（Optuna walk-forward）已生成 auto_tuned 权重，灰度观察 10 天
 - ⚠️ **彩票结果高度随机**：所有分析仅基于历史统计，不代表未来结果
 
 ## 风险提示
