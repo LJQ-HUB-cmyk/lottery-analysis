@@ -44,7 +44,7 @@ review:
 
 ## 权重自动调优（需 review_history >= 15 期）
 tune:
-	python scripts/tune_weights.py --lottery $(LOTTERY) --trials 30 --periods 50
+	python scripts/tune_scoring_params.py --lottery $(LOTTERY) --trials 30 --periods 50
 
 ## 可视化（HTML 交互图）
 chart:

@@ -319,7 +319,7 @@ def append_to_history(report, lottery, strategy='default'):
 
     if history_path.exists():
         old_df = pd.read_csv(history_path, dtype=str, encoding='utf-8-sig')
-        # 同彩种+同期号+同策略只保留最新（三策略独立记录）
+        # 同彩种+同期号+同策略只保留最新（多策略独立记录）
         merged = pd.concat([old_df, new_df], ignore_index=True)
         merged = merged.drop_duplicates(subset=['彩种', '期号', '策略'], keep='last')
         merged = merged[columns]

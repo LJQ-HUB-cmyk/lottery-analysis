@@ -141,7 +141,7 @@ def cold_numbers(win: dict) -> list[str]:
 # ═══════════════════════════════════════════
 
 def pick_latest_review(rows: list[dict[str, str]]) -> list[dict[str, str]]:
-    """每个彩种取最新一期（三策略各一条）"""
+    """每个彩种取最新一期"""
     if not rows:
         return []
     latest: dict[str, int] = {}
@@ -174,7 +174,7 @@ def format_review_section() -> str:
 
         其他策略：
         - default：和值差+跨度差=2
-        - aggressive：和值差+跨度差=3
+        - diversity：和值差+跨度差=3
 
         复盘结论：昨日排列三走势落在中和值、中跨度、组六形态区间，conservative 策略判断最接近。
     """
@@ -369,7 +369,8 @@ def normalize_strategy_name(name: str) -> str:
     mapping = {"默认": "标准", "default": "标准", "standard": "标准",
                "稳健": "稳健", "conservative": "稳健",
                "多样性": "多样性", "diversity": "多样性",
-               "auto_tuned": "自动调参"}
+               "auto_tuned": "自动调参",
+               "ensemble": "融合策略"}
     return mapping.get(name, name)
 
 
@@ -515,7 +516,7 @@ def format_prediction_section(lottery: str, label: str) -> str:
     升级版预测格式化：
       核心观察（和值/跨度/形态/冷热）
       Top10 候选
-      三策略共振号码
+      多策略共振号码
       重点关注 ⭐
       备选关注
     """
@@ -532,7 +533,7 @@ def format_prediction_section(lottery: str, label: str) -> str:
     stats = load_stats_cache(lottery)
     obs_lines = format_observation(stats, label, pred_data=data)
 
-    # 三策略共振
+    # 多策略共振
     consensus_nums: dict[str, int] = {}
     for suffix, sname in [("", "default"), ("_conservative", "稳健"),
                            ("_diversity", "多样性"), ("_auto_tuned", "自动调参"),
@@ -546,7 +547,7 @@ def format_prediction_section(lottery: str, label: str) -> str:
     consensus = sorted([(n, c) for n, c in consensus_nums.items() if c >= 2],
                        key=lambda x: (-x[1], x[0]))
 
-    # 共振号分档：三策略全命中 vs 仅两策略
+    # 共振号分档：多策略命中 vs 仅两策略
     triple = [n for n, c in consensus if c >= 3]
     double = [n for n, c in consensus if c >= 2 and c < 3]
 
@@ -561,9 +562,9 @@ def format_prediction_section(lottery: str, label: str) -> str:
     parts.append(f"Top10候选：\n{' '.join(top10) if top10 else '暂无'}")
 
     if triple:
-        parts.append(f"\n三策略共振（三策略交集）：\n{' '.join(triple)}")
+        parts.append(f"\n多策略共振（≥3策略交集）：\n{' '.join(triple)}")
     if double:
-        parts.append(f"三策略共振（两策略交集）：\n{' '.join(double)}")
+        parts.append(f"多策略共振（两策略交集）：\n{' '.join(double)}")
 
     # 重点关注（从推荐列表首部 + 共振取交集）
     # 从 default 推荐列表提取评分前几的号码作为"重点关注"
@@ -574,7 +575,7 @@ def format_prediction_section(lottery: str, label: str) -> str:
             n = str(item.get("号码", "")).zfill(3)
             top_scores[n] = item.get("总分", 0)
 
-    # 重点关注 = 三策略共振 + default 评分前15
+    # 重点关注 = 多策略共振 + default 评分前15
     primary_candidates = set(triple)
     # 从评分前15抽和共振的交集，如果没有足够，从共振中补
     top15 = list(top_scores.keys())[:15]
@@ -633,7 +634,7 @@ def build_summary_section() -> str:
 
         # 共振
         consensus_nums: dict[str, int] = {}
-        for suffix in ["", "_conservative", "_diversity"]:
+        for suffix in ["", "_conservative", "_diversity", "_auto_tuned", "_ensemble"]:
             sp = PRED_DIR / f"latest_{lottery}{suffix}.json"
             sd = read_json(sp)
             if sd:

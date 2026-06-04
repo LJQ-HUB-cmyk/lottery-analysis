@@ -66,17 +66,21 @@ lottery-analysis/
 │   ├── feature_engine.py         # 113维特征工程 + 数据质量检查
 │   ├── stats_engine.py           # 多窗口统计 + 理论分布
 │   ├── scoring_engine.py         # 评分引擎v2（YAML权重 + 回归惩罚 + 多样性）
-│   ├── backtest.py               # Walk-forward 回测（三策略对比 + ROI拆分）
+│   ├── backtest.py               # Walk-forward 回测（多策略对比 + ROI拆分）
 │   ├── compare_result.py         # 预测 vs 开奖对比 + review_history累加
 │   ├── review_summary.py         # 最近N期复盘表现摘要
 │   ├── daily_review.py           # 每日复盘一键脚本（Hermes cron调用）
-│   ├── tune_weights.py           # 权重自动调优（已升级为 tune_scoring_params.py）
-│   ├── filter_engine.py          # 轻量预过滤（已降级）
+│   ├── tune_scoring_params.py     # 权重自动调优（Optuna 贝叶斯优化）
+│   ├── build_ensemble_predictions.py # 策略融合（共识投票加权预测）
+│   ├── apply_draw_overrides.py    # 人工开奖修正
+│   ├── audit_lottery_data.py      # 数据审计
+│   ├── report_tuning_status.py    # 查看调参状态
 │   ├── visualize.py              # 走势图/热力图（matplotlib + plotly）
 │   ├── issue_utils.py            # 期号标准化（PLS/D3格式互转）
 │   ├── source_health.py          # 数据源健康报告
 │   ├── hermes_push.py            # 两段式推送（predict/review/daily三种模式 + dedup_key业务键去重）
 │   ├── kl8/                    # 快乐8独立模块
+│   │   ├── common.py           # 共享常量与工具
 │   │   ├── fetcher.py          # 官方API抓取 + 校验 + --check
 │   │   ├── predictor.py        # 20码池 + 选四主推
 │   │   ├── reviewer.py         # 选四命中/盈亏/期号精确匹配

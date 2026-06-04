@@ -167,7 +167,7 @@ def main():
         if args.lottery != "all":
             daily_cmd += ["--lottery", args.lottery]
         daily_ok, daily_output = run(
-            daily_cmd, "拉取开奖 + 特征工程 + 三策略对比 + 复盘摘要",
+            daily_cmd, "拉取开奖 + 特征工程 + 多策略对比 + 复盘摘要",
             timeout=600,
         )
 
