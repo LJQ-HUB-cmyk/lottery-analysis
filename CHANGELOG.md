@@ -4,6 +4,7 @@
 
 ## v2.18.0 (2026-06-05)
 
+- **新增增强预测器 v1**：`scripts/enhanced_predictor.py`，5 大改进提升命中率——分位数字分析（百/十/个位各取 Top3 组合 27 注）、和值区间过滤（±2 优先）、对子/连号模式加分、热号池展开组合、多期窗口动态权重。集成到 `run_daily.py --strategy enhanced`
 - **实盘策略调优**：形态权重 12→16（修复 D3 组三全军覆没）；过热衰减 0.6/0.8→0.75/0.9（修复号码频繁掉出 Top30）；多样性 span_spread 8→5（修复跨差偏大）
 - **性能优化**：`feature_engine.py` 遗漏值计算重写为 numpy 批量版本；`scoring_engine.py` `generate_all()` 加模块级缓存；`stats_engine.py` 理论分布加模块级缓存
 - **Bug 修复**：`scoring_engine.py` `cold_count` 未定义风险；`compare_result.py` 期号类型统一为 str；`hermes_push.py` KL8 空 target 匹配漏洞；`compare_result.py` `__len__()` 改为 `len()`；`push_sender.py` 微信首次发送不再强制 sleep 5s

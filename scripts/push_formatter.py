@@ -485,7 +485,7 @@ def format_prediction_section(lottery: str, label: str) -> str:
 
     # 多策略共振
     consensus_nums: dict[str, int] = {}
-    for suffix in ["", "_conservative", "_diversity", "_auto_tuned", "_ensemble"]:
+    for suffix in ["", "_conservative", "_diversity", "_auto_tuned", "_enhanced", "_ensemble"]:
         sp = PRED_DIR / f"latest_{lottery}{suffix}.json"
         sd = read_json(sp)
         if sd:
@@ -571,7 +571,7 @@ def build_summary_section() -> str:
         top10 = extract_top10(data)
 
         consensus_nums: dict[str, int] = {}
-        for suffix in ["", "_conservative", "_diversity", "_auto_tuned", "_ensemble"]:
+        for suffix in ["", "_conservative", "_diversity", "_auto_tuned", "_enhanced", "_ensemble"]:
             sp = PRED_DIR / f"latest_{lottery}{suffix}.json"
             sd = read_json(sp)
             if sd:
@@ -714,7 +714,8 @@ def build_review_performance(lottery_filter: str = "all") -> str:
 
     parts = ["━━━━━━━━━━━━━━\n三、近期策略表现\n━━━━━━━━━━━━━━"]
     label_map = {"default": "标准", "conservative": "稳健", "diversity": "多样性",
-                 "auto_tuned": "自动调参", "ensemble": "融合策略"}
+                 "auto_tuned": "自动调参", "enhanced": "增强策略",
+                 "ensemble": "融合策略"}
     for i, row in enumerate(rows):
         if row.get("策略", "") == "默认":
             rows[i]["策略"] = "标准"
@@ -724,7 +725,7 @@ def build_review_performance(lottery_filter: str = "all") -> str:
 
     for lotto in wanted:
         parts.append(f"\n【{lotto}】")
-        for st in ["default", "conservative", "diversity", "auto_tuned", "ensemble"]:
+        for st in ["default", "conservative", "diversity", "auto_tuned", "enhanced", "ensemble"]:
             records = lottery_data.get(lotto, {}).get(st, [])
             if not records:
                 continue
@@ -820,7 +821,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
 
         for st_key, st_label in [("default", "默认"), ("conservative", "稳健"),
                                ("diversity", "多样性"), ("auto_tuned", "自动调参"),
-                               ("ensemble", "融合策略")]:
+                               ("enhanced", "增强策略"), ("ensemble", "融合策略")]:
             item = next((r for r in items if r.get("策略", "") == st_key), None)
             if not item:
                 continue
