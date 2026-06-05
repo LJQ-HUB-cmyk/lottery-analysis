@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 BASE = Path(__file__).resolve().parent.parent.parent
 OUTPUT_DIR = BASE / "output" / "kl8"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CN_TZ = timezone(timedelta(hours=8))
 
@@ -38,6 +37,10 @@ def compute(rows: list[dict]) -> dict:
         else:
             cur_miss = 0
 
+    # 加权命中分：中四=93, 中三=5, 中二=3, 未中=0
+    weighted_score = hit4 * 93 + hit3 * 5 + hit2 * 3
+    weighted_avg = round(weighted_score / total, 2) if total else 0
+
     return {
         "days": total,
         "total_cost": sum(costs),
@@ -47,6 +50,8 @@ def compute(rows: list[dict]) -> dict:
         "hit3_count": hit3,
         "hit4_count": hit4,
         "hit_rate": round((hit2 + hit3 + hit4) / total, 4) if total else 0,
+        "weighted_hit_score": weighted_score,
+        "weighted_hit_avg": weighted_avg,
         "avg_pool_hit": round(sum(pool_hits) / total, 2) if total else 0,
         "max_miss_streak": max_miss,
     }
@@ -76,6 +81,7 @@ def main():
         "updated_at": datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M:%S"),
     }
 
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUTPUT_DIR / "kl8_metrics.json"
     out.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
 

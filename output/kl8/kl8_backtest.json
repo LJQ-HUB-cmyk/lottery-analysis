@@ -1,0 +1,36 @@
+{
+  "lottery": "kl8",
+  "periods": 10,
+  "train_window": 30,
+  "pool_size": 20,
+  "hot_ratio": 0.6,
+  "results": {
+    "热冷策略": {
+      "periods": 10,
+      "total_cost": 20,
+      "total_prize": 3,
+      "total_profit": -17,
+      "roi": -85.0,
+      "pool_hit_avg": 4.7,
+      "hit2": 1,
+      "hit3": 0,
+      "hit4": 0,
+      "hit_rate": 10.0,
+      "max_miss_streak": 8
+    },
+    "随机基准": {
+      "periods": 10,
+      "total_cost": 20,
+      "total_prize": 101,
+      "total_profit": 81,
+      "roi": 405.0,
+      "pool_hit_avg": 4.7,
+      "hit2": 1,
+      "hit3": 1,
+      "hit4": 1,
+      "hit_rate": 30.0,
+      "max_miss_streak": 6
+    }
+  },
+  "generated_at": "2026-06-05 20:31:02"
+}

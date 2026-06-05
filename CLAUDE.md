@@ -64,18 +64,23 @@ lottery-analysis/
 │   ├── apply_draw_overrides.py # 人工开奖修正
 │   ├── audit_lottery_data.py   # 数据审计
 │   ├── report_tuning_status.py # 查看调参状态
+│   ├── patch_pls_dates.py    # 排列三历史日期补全工具
 │   ├── visualize.py          # 走势图/热力图（matplotlib + plotly）
 │   ├── issue_utils.py         # 期号标准化（PLS/D3格式互转）
 │   ├── source_health.py       # 数据源健康报告
-│   ├── hermes_push.py         # 两段式推送（支持 --lottery pls/d3/kl8）
+│   ├── hermes_push.py         # 两段式推送 CLI 入口（调用 push_formatter + push_sender）
+│   ├── push_formatter.py      # 推送内容格式化（预测/复盘/KL8/健康报告）
+│   ├── push_sender.py         # 多通道发送（飞书/微信/webhook）+ 去重 + 锁
 │   ├── kl8/                    # 快乐8独立模块
 │   │   ├── common.py           # 共享常量与工具
 │   │   ├── fetcher.py          # 官方API抓取 + 校验 + --check
 │   │   ├── predictor.py        # 20码池 + 选四主推
 │   │   ├── reviewer.py         # 选四命中/盈亏/期号精确匹配
-│   │   ├── check.py            # 全链路5项健康检查
-│   │   ├── metrics.py          # 近N期累计成本/奖金/盈亏
-│   │   ├── stats.py            # 奇偶/大小/连号/和值/冷热统计
+│   │   ├── check.py            # 全链路5项健康检查（支持 --stage predict/review/full）
+│   │   ├── metrics.py          # 近N期累计成本/奖金/盈亏（含加权命中分）
+│   │   ├── stats.py            # 奇偶/大小/连号/和值/冷热/全量遗漏统计
+│   │   ├── backtest.py         # Walk-Forward 回测（热冷策略 vs 随机基准）
+│   │   ├── compare_strategies.py # 多策略对比报告
 │   │   └── strategy.py         # 4策略统一接口（暂不启用）
 │   ├── jobs/                    # Python job 业务编排（Shell 薄入口调用）
 │   │   ├── lottery_predict_job.py   # PLS/D3 预测编排
@@ -93,6 +98,7 @@ lottery-analysis/
 │   ├── scoring_weights.yaml              # 默认权重
 │   ├── scoring_weights_conservative.yaml # 稳健策略
 │   ├── scoring_weights_diversity.yaml    # 多样性策略
+│   ├── prizes.yaml                       # 各彩种各玩法奖金配置
 │   └── data_sources.yaml                 # 数据源配置
 ├── data/
 │   ├── raw/         # 原始CSV（git忽略）
@@ -101,6 +107,7 @@ lottery-analysis/
 │   ├── cache/       # 统计缓存 + 熔断状态（git忽略）
 │   ├── kl8/         # 快乐8历史数据 + latest JSON
 │   └── quarantine/  # 坏数据隔离区（git忽略）
+├── tests/                # 单元测试（pytest）
 └── output/
     ├── predictions/ # 预测JSON
     ├── reviews/     # 复盘CSV
@@ -212,7 +219,11 @@ python scripts/kl8/reviewer.py                     # 选四命中+盈亏复盘
 python scripts/kl8/metrics.py                      # 更新累计表现
 
 # 健康检查
-python scripts/kl8/check.py                        # 全链路5项检查
+python scripts/kl8/check.py                        # 全链路健康检查（--stage predict/review/full）
+
+# 回测 & 对比
+python scripts/kl8/backtest.py --periods 30        # Walk-Forward 回测
+python scripts/kl8/compare_strategies.py           # 多策略对比报告
 
 # 推送
 python scripts/hermes_push.py --mode predict --lottery kl8   # 推送预测
@@ -226,6 +237,13 @@ python -c "from scripts.kl8.strategy import list_strategies; print(list_strategi
 
 ```bash
 python scripts/issue_utils.py                            # 自测
+```
+
+### 单元测试
+
+```bash
+python -m pytest tests/ -v                               # 运行全部测试
+python -m pytest tests/test_scoring_engine.py -v         # 仅评分引擎测试
 ```
 
 ### 权重调优（需 review_history ≥ 15 期）
@@ -265,7 +283,9 @@ scripts/push/*.sh（薄入口：cd/加锁/日志）
     ↓
 scripts/jobs/*.py（业务编排：拉取→判断→复盘→去重→推送）
     ↓
-scripts/hermes_push.py（推送内容生成 + dedup_key去重 + 发送）
+scripts/hermes_push.py（CLI入口）
+    → scripts/push_formatter.py（推送内容生成）
+    → scripts/push_sender.py（dedup_key去重 + 多通道发送）
     ↓
 output/status/*.json（任务状态记录）
 ```
@@ -288,18 +308,22 @@ output/status/*.json（任务状态记录）
 14. **统一退出码**：0=正常（含等待开奖/已推送跳过），2=业务异常（阻断推送），3=环境异常（venv缺失）
 15. **状态可追踪**：每个 Job 写 `output/status/*.json`，含 status/dedup_key/issues/reason，排查不再靠 grep 日志猜测
 16. **KL8 复盘三重防旧数据**：删旧文件 → 时间戳校验 → 期号匹配预测期号，防止旧文件被误推
+17. **奖金配置外部化**：`rules/prizes.yaml` 统一管理 PLS/D3/KL8 各玩法奖金，回测/复盘从 YAML 读取
+18. **hermes_push 拆分**：CLI 入口（hermes_push.py）→ 内容格式化（push_formatter.py）→ 发送/去重/锁（push_sender.py）
 
 ## 未解决问题
 
 > 以下为已知但暂不致命的问题。解决后打 ✅。
 
-- [ ] **js-lottery 排列三主源持续 fallback** — fallback 路径仅解析 10 条，影响历史数据完整性。建议采集失败响应样本到 `logs/source_samples/`
+- [ ] **js-lottery 排列三主源持续 fallback** — fallback 路径仅解析 10 条，影响历史数据完整性。主源正常时不影响。可用 `--verify-backup` 验证备份源。建议采集失败响应样本到 `logs/source_samples/`
 - [x] **21:35/22:05 推送记录缺失无法回溯** — 已改为单彩种独立推送（22:10/22:15/22:20），旧三波补偿 cron 已删除
 - [x] **push_state.json 不存在** — `--stdout + deliver=origin` 模式不创建（预期行为），去重靠 dedup_key + send_log.jsonl
 
 ## 文件编码
 
-所有 CSV/JSON/YAML 统一使用 UTF-8-sig（Windows 兼容）。Python open() 必须显式指定 encoding='utf-8' 或 'utf-8-sig'。
+- CSV 文件使用 `utf-8-sig`（Windows Excel 兼容）
+- JSON/YAML 文件使用 `utf-8`（标准格式，不含 BOM）
+- Python `open()` 必须显式指定 `encoding='utf-8'` 或 `'utf-8-sig'`
 
 ## KL8 后续计划
 
@@ -307,17 +331,17 @@ output/status/*.json（任务状态记录）
 
 ### P1：近期可做
 
-- [ ] `scripts/kl8/backtest.py` 回测脚本 — 等 review_history ≥ 30 条后建，对比 4 策略表现
-- [ ] `scripts/kl8/rules.py` 统一奖级表 — 选一~选十标准奖金，替代 reviewer 硬编码
-- [ ] predictor 分区均衡约束 — `--zone-balance` 参数，避免候选池过度集中
-- [ ] metrics 命中率加权 — 中四 > 中三 > 中二分值不同
+- [x] `scripts/kl8/backtest.py` 回测脚本 — 已创建（v2.18.0），walk-forward 对比热冷策略 vs 随机基准
+- [x] `scripts/kl8/rules.py` 统一奖级表 — 已由 `rules/prizes.yaml` 实现，`kl8/reviewer.py` 从 YAML 读取
+- [x] predictor 分区均衡约束 — 已实现（v2.18.0）`--zone-balance` 参数，每区至少 3 个号码
+- [x] metrics 命中率加权 — 已实现（v2.18.0）`weighted_hit_score` 字段，中四=93/中三=5/中二=3
 
 ### P2：数据积累后做
 
-- [ ] 多策略对比报告 — v0随机/v1热冷/v2分区/v3遗漏，30天后跑一次完整对比
-- [ ] stats.py 全量遗漏表 — 当前只有 top10
-- [ ] check.py `--stage` 参数 — 区分 predict/review/full 检查场景
-- [ ] 推送模板加奇偶/大小/连号展示 — stats 已有数据，模板可扩展
+- [x] 多策略对比报告 — 已创建（v2.18.0）`scripts/kl8/compare_strategies.py`
+- [x] stats.py 全量遗漏表 — 已实现（v2.18.0）`missing_all` 字段，全量 80 个号码
+- [x] check.py `--stage` 参数 — 已实现（v2.18.0）`--stage predict|review|full`
+- [x] 推送模板加奇偶/大小展示 — 已实现（v2.18.0）`format_observation()` 增加奇偶/大小倾向
 
 ### 暂不做
 

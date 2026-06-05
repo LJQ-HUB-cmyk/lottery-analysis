@@ -690,6 +690,8 @@ def main():
     parser.add_argument('--source', choices=['zhcw', 'eastmoney', 'auto'],
                         default='auto',
                         help='福彩3D数据源：zhcw/eastmoney/auto')
+    parser.add_argument('--verify-backup', action='store_true',
+                        help='强制使用备份源（验证备用源可用性）')
     parser.add_argument('--cb-status', action='store_true',
                         help='打印熔断器状态后退出')
     args = parser.parse_args()
@@ -707,14 +709,20 @@ def main():
     start = datetime.now()
     logger.info("=== 开始数据更新 ===")
 
+    # --verify-backup: 强制使用备份源（验证备用源可用性）
+    if args.verify_backup:
+        logger.info("🔧 验证备份源模式：排列三用 sporttery，福彩3D 用 zhcw")
+
     # ─── 排列三 ───
     if args.all or args.lottery == 'pls':
         pls_data = None
         js_cfg = {'max_failures': 3, 'cooldown_minutes': 60}
         sporttery_cfg = {'max_failures': 2, 'cooldown_minutes': 120}
 
-        # Source 1: js-lottery (primary)
-        if cb.should_skip('pls_js_lottery', **js_cfg):
+        # Source 1: js-lottery (primary, --verify-backup 时跳过)
+        if args.verify_backup:
+            logger.info("排列三: 跳过主源(js-lottery)，直接用备份源(sporttery)")
+        elif cb.should_skip('pls_js_lottery', **js_cfg):
             logger.info("排列三: js-lottery 冷却中，跳过")
         else:
             try:
@@ -784,8 +792,10 @@ def main():
         else:  # auto: eastmoney primary → zhcw fallback → verify
             d3_primary_source = None  # 追踪主源，用于双源互验
 
-            # Primary: eastmoney
-            if cb.should_skip('d3_eastmoney', **em_cfg):
+            # Primary: eastmoney（--verify-backup 时跳过，直接用 zhcw）
+            if args.verify_backup:
+                logger.info("福彩3D: 跳过主源(eastmoney)，直接用备份源(zhcw)")
+            elif cb.should_skip('d3_eastmoney', **em_cfg):
                 logger.info("福彩3D: eastmoney 冷却中")
             else:
                 try:

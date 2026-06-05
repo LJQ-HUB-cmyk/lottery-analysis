@@ -128,12 +128,25 @@ def check_review():
     ok(f"复盘期号={data.get('issue')} 玩法={data.get('play_type')} "
        f"命中={data.get('play4_hit_count')}/4 盈亏={data.get('profit')}")
 
-    # review 期号应与 predict 期号一致
+    # review 期号应比 predict 期号早 1 期（复盘上一期，预测下一期）
     pp = OUTPUT_DIR / "kl8_predict_latest.json"
     if pp.exists():
         pred = json.loads(pp.read_text(encoding="utf-8"))
-        if pred.get("predicted_issue") != data.get("issue"):
-            warn(f"复盘期号({data.get('issue')}) ≠ 预测期号({pred.get('predicted_issue')})")
+        pred_issue = pred.get("predicted_issue", "")
+        review_issue = data.get("issue", "")
+        if pred_issue and review_issue:
+            try:
+                diff = int(pred_issue) - int(review_issue)
+                if diff == 1:
+                    ok(f"期号关系正常：复盘{review_issue} → 预测{pred_issue}")
+                elif diff == 0:
+                    ok(f"复盘与预测同期（{review_issue}，可能尚未开奖）")
+                elif diff < 0:
+                    warn(f"复盘期号({review_issue}) > 预测期号({pred_issue})，数据异常")
+                else:
+                    warn(f"复盘期号({review_issue}) 比预测({pred_issue}) 早 {diff} 期，可能漏盘")
+            except ValueError:
+                info(f"期号非纯数字，跳过比较（复盘={review_issue} 预测={pred_issue}）")
 
 
 def check_review_history():
@@ -160,18 +173,29 @@ def check_review_history():
 
 
 def main():
+    import argparse
     global ERRORS
-    print("🔍 快乐8 全链路健康检查")
 
-    check_history()
-    check_latest()
-    check_predict()
-    check_review()
-    check_review_history()
+    parser = argparse.ArgumentParser(description="快乐8全链路健康检查")
+    parser.add_argument("--stage", choices=["predict", "review", "full"],
+                        default="full",
+                        help="检查阶段：predict=仅数据+预测，review=仅复盘，full=全部（默认）")
+    args = parser.parse_args()
+
+    print(f"🔍 快乐8 健康检查 [{args.stage}]")
+
+    if args.stage in ("predict", "full"):
+        check_history()
+        check_latest()
+        check_predict()
+
+    if args.stage in ("review", "full"):
+        check_review()
+        check_review_history()
 
     print()
     if ERRORS == 0:
-        print("✅ KL8 全链路检查通过")
+        print("✅ KL8 检查通过")
         sys.exit(0)
     else:
         print(f"❌ {ERRORS} 个问题需要处理")

@@ -14,7 +14,6 @@
 | [../CLAUDE.md](../CLAUDE.md) | 项目指令（给 AI Agent 看） |
 | [../README.md](../README.md) | 项目说明（给人看） |
 | [../CHANGELOG.md](../CHANGELOG.md) | 版本变更日志 |
-| [../PROJECT_REVIEW.md](../PROJECT_REVIEW.md) | 历史审查记录 |
 
 ## 历史归档（`archive/`）
 

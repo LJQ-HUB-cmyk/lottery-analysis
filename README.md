@@ -75,18 +75,23 @@ lottery-analysis/
 │   ├── apply_draw_overrides.py    # 人工开奖修正
 │   ├── audit_lottery_data.py      # 数据审计
 │   ├── report_tuning_status.py    # 查看调参状态
+│   ├── patch_pls_dates.py         # 排列三历史日期补全工具
 │   ├── visualize.py              # 走势图/热力图（matplotlib + plotly）
 │   ├── issue_utils.py            # 期号标准化（PLS/D3格式互转）
 │   ├── source_health.py          # 数据源健康报告
-│   ├── hermes_push.py            # 两段式推送（predict/review/daily三种模式 + dedup_key业务键去重）
+│   ├── hermes_push.py            # 两段式推送 CLI 入口（调用 push_formatter + push_sender）
+│   ├── push_formatter.py         # 推送内容格式化（预测/复盘/KL8/健康报告）
+│   ├── push_sender.py            # 多通道发送（飞书/微信/webhook）+ 去重 + 锁
 │   ├── kl8/                    # 快乐8独立模块
 │   │   ├── common.py           # 共享常量与工具
 │   │   ├── fetcher.py          # 官方API抓取 + 校验 + --check
 │   │   ├── predictor.py        # 20码池 + 选四主推
 │   │   ├── reviewer.py         # 选四命中/盈亏/期号精确匹配
-│   │   ├── check.py            # 全链路5项健康检查
-│   │   ├── metrics.py          # 近N期累计成本/奖金/盈亏
-│   │   ├── stats.py            # 奇偶/大小/连号/和值/冷热统计
+│   │   ├── check.py            # 全链路健康检查（支持 --stage predict/review/full）
+│   │   ├── metrics.py          # 近N期累计成本/奖金/盈亏（含加权命中分）
+│   │   ├── stats.py            # 奇偶/大小/连号/和值/冷热/全量遗漏统计
+│   │   ├── backtest.py         # Walk-Forward 回测（热冷策略 vs 随机基准）
+│   │   ├── compare_strategies.py # 多策略对比报告
 │   │   └── strategy.py         # 4策略统一接口（暂不启用）
 │   ├── jobs/                    # Python job 业务编排（Shell 薄入口调用）
 │   │   ├── lottery_predict_job.py   # PLS/D3 预测编排
@@ -100,14 +105,13 @@ lottery-analysis/
 │       ├── lottery_review_push.sh   # 复盘推送（→ lottery_review_job.py）
 │       ├── kl8_predict_push.sh      # KL8预测推送（→ kl8_predict_job.py）
 │       ├── kl8_review_push.sh       # KL8复盘推送（→ kl8_review_job.py）
-│       └── kl8_check_push.sh        # KL8健康检查包装（待启用）
+│       └── kl8_check_push.sh        # KL8健康检查（异常时主动推送）
 ├── rules/
 │   ├── scoring_weights.yaml              # 默认权重
 │   ├── scoring_weights_conservative.yaml # 稳健策略
 │   ├── scoring_weights_diversity.yaml    # 多样性策略
-│   ├── data_sources.yaml                 # 数据源配置（URL外部化）
-│   ├── pls_default.yaml                  # 排列三过滤规则
-│   └── d3_default.yaml                   # 福彩3D过滤规则
+│   ├── prizes.yaml                       # 各彩种各玩法奖金配置
+│   └── data_sources.yaml                 # 数据源配置（URL外部化）
 ├── data/
 │   ├── raw/                  # 原始CSV（data_fetcher.py储存位置）
 │   ├── processed/            # 特征工程输出（113维）
@@ -123,9 +127,9 @@ lottery-analysis/
 │   ├── push/                 # 推送日报 + 发送日志 + pending补发
 │   ├── status/               # 任务状态JSON（运行时产物，git忽略）
 │   └── tuning/               # 调参记录
+├── tests/                    # 单元测试（pytest）
 ├── CLAUDE.md                 # Agent 项目指令
 ├── Makefile                  # 一键命令入口
-├── PROJECT_REVIEW.md         # 项目审查记录
 ├── CHANGELOG.md              # 集中式变更日志
 ├── docs/                     # 项目文档（配置/记录/计划）
 └── requirements.txt          # 依赖清单
@@ -165,8 +169,8 @@ lottery-analysis/
 ## 后续计划
 
 - [x] 评分权重系统调优 — 已升级为 `tune_scoring_params.py`（Optuna walk-forward），auto_tuned 灰度运行中
-- [ ] 遗漏计算真正向量化（去除 Python for 循环，当前 7600 行性能足够）
-- [ ] GitHub Actions 每日自动运行（可选）
+- [x] 遗漏计算向量化 — 已用 numpy 批量计算替代 `df.iloc` 逐元素赋值
+- [x] GitHub Actions 每日自动运行 — 已创建 `.github/workflows/daily.yml`
 
 > ❌ **不考虑 LSTM/ML 预测模块**，原因：
 >
@@ -336,7 +340,9 @@ python scripts/jobs/kl8_predict_job.py        # KL8 预测
 Hermes / cron            → 定时触发
 scripts/push/*.sh        → 薄入口：切目录、加锁、日志、启动 Python
 scripts/jobs/*.py        → 业务编排：拉取、预测/复盘、状态判断、去重
-scripts/hermes_push.py   → 推送内容生成 + dedup_key 去重 + 发送
+scripts/hermes_push.py   → CLI 入口
+  scripts/push_formatter.py → 推送内容生成
+  scripts/push_sender.py    → dedup_key 去重 + 多通道发送
 output/status/*.json     → 每次任务的状态记录（ready/pushed/skipped_waiting/error）
 ```
 

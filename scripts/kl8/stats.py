@@ -14,7 +14,6 @@ from scripts.kl8.common import parse_kl8_numbers
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CN_TZ = timezone(timedelta(hours=8))
 
@@ -64,8 +63,8 @@ def frequency(draws: list[list[int]]) -> dict:
             "cold": [n for n, _ in freq.most_common()[-20:]]}
 
 
-def missing_streaks(draws: list[list[int]]) -> dict:
-    """计算每个号码当前遗漏期数"""
+def missing_streaks(draws: list[list[int]], top_n: int = 0) -> dict:
+    """计算每个号码当前遗漏期数。top_n=0 返回全部 80 个号码。"""
     missing = {}
     for num in range(1, 81):
         for i, nums in enumerate(draws):
@@ -74,7 +73,10 @@ def missing_streaks(draws: list[list[int]]) -> dict:
                 break
         else:
             missing[num] = len(draws)
-    return dict(sorted(missing.items(), key=lambda x: -x[1])[:10])
+    sorted_miss = dict(sorted(missing.items(), key=lambda x: -x[1]))
+    if top_n > 0:
+        return dict(list(sorted_miss.items())[:top_n])
+    return sorted_miss
 
 
 def main():
@@ -114,10 +116,12 @@ def main():
             "sum_avg": round(sum(sum(d) for d in recent30) / len(recent30), 1),
         },
         "frequency": frequency(recent30),
-        "top_missing": missing_streaks(recent30),
+        "top_missing": missing_streaks(recent30, top_n=10),
+        "missing_all": missing_streaks(recent30),
         "updated_at": datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M:%S"),
     }
 
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUTPUT_DIR / "kl8_stats.json"
     out.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ 快乐8统计指标 → {out}")

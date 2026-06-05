@@ -21,9 +21,22 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
+import yaml
 
 # 复用评分引擎
 from scoring_engine import generate_all, generate_predictions, load_weights
+
+
+def _load_prizes(lottery='pls'):
+    """从 rules/prizes.yaml 加载奖金配置"""
+    base = Path(__file__).resolve().parent.parent
+    prize_path = base / 'rules' / 'prizes.yaml'
+    if prize_path.exists():
+        with open(prize_path, 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f) or {}
+        return cfg.get(lottery, cfg.get('pls', {}))
+    # 兜底默认值
+    return {'直选': 1040, '组三': 346, '组六': 173}
 
 
 # ==========================================
@@ -115,6 +128,10 @@ def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
     
     rng = random.Random(seed if seed is not None else 42)
 
+    def _build_freq(df_window, col_name):
+        freq = df_window[col_name].value_counts().to_dict()
+        return {int(k): int(v) for k, v in freq.items()}
+
     # 加载权重（支持自定义路径）
     weights, params = load_weights(weight_path)
 
@@ -168,11 +185,7 @@ def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
             t5 = train_df.head(5)
             t10 = train_df.head(10)
             t30 = train_df.head(30)
-            
-            def _build_freq(df_window, col_name):
-                freq = df_window[col_name].value_counts().to_dict()
-                return {int(k): int(v) for k, v in freq.items()}
-            
+
             stats_template['窗口']['近5期'] = {
                 '和值频率': _build_freq(t5, '和值'),
                 '跨度频率': _build_freq(t5, '跨度'),
@@ -238,13 +251,18 @@ def walk_forward(df: pd.DataFrame, theory: dict, top_k: int = 30,
             print(f"    进度: {i+1}/{test_periods} 期")
     
     # 汇总
+    prizes = _load_prizes(lottery_code)
+    p_direct = prizes.get('直选', 1040)
+    p_group3 = prizes.get('组三', 346)
+    p_group6 = prizes.get('组六', 173)
+
     results = {}
     for sname, s in strategies.items():
         avg_candidates = np.mean(s['candidates']) if s['candidates'] else 0
         total_cost = avg_candidates * 2 * test_periods
-        direct_prize = s['hits_direct'] * 1040
-        group3_prize = s['hits_group3'] * 346
-        group6_prize = s['hits_group6'] * 173
+        direct_prize = s['hits_direct'] * p_direct
+        group3_prize = s['hits_group3'] * p_group3
+        group6_prize = s['hits_group6'] * p_group6
         group_prize = group3_prize + group6_prize
         total_prize = direct_prize + group_prize
         roi = (total_prize - total_cost) / total_cost * 100 if total_cost > 0 else 0

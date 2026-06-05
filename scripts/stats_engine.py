@@ -22,11 +22,18 @@ import numpy as np
 #  理论分布
 # ==========================================
 
+_cached_theory = None
+
+
 def generate_theoretical_distribution() -> dict:
     """
     计算000-999全部1000个号码的理论分布。
-    返回每个特征的理论频率字典。
+    返回每个特征的理论频率字典。结果缓存到模块级变量。
     """
+    global _cached_theory
+    if _cached_theory is not None:
+        return _cached_theory
+
     all_nums = np.array([(a, b, c) for a in range(10) for b in range(10) for c in range(10)])
     r1, r2, r3 = all_nums[:, 0], all_nums[:, 1], all_nums[:, 2]
     
@@ -98,7 +105,8 @@ def generate_theoretical_distribution() -> dict:
         '中跨(4-6)': int(np.sum((spans >= 4) & (spans <= 6))),
         '大跨(7-9)': int(np.sum((spans >= 7) & (spans <= 9))),
     }
-    
+
+    _cached_theory = theory
     return theory
 
 

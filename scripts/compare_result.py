@@ -106,9 +106,9 @@ def compare(predictions, actual):
 
 def build_report(pred_json, actual, rows):
     """生成对比报告"""
-    # 期号不匹配时分类处理
-    pred_issue = str(pred_json.get('预测期号', ''))
-    actual_issue = str(actual['期号'])
+    # 期号不匹配时分类处理（统一转 str 避免 int vs str 误判）
+    pred_issue = str(pred_json.get('预测期号', '')).strip()
+    actual_issue = str(actual['期号']).strip()
     if pred_issue != actual_issue:
         try:
             pred_num = int(pred_issue)
@@ -157,7 +157,7 @@ def build_report(pred_json, actual, rows):
     elif group_hit:
         one_line = f"开奖 {actual['开奖号码']} | 组选命中第{best_group['排名']}名 | 和值{actual['和值']} 跨度{actual['跨度']}"
     else:
-        one_line = f"开奖 {actual['开奖号码']} | 未命中 最近和差{min_sum_diff['和值差']}跨差{min_span_diff['跨度差']} | 形态一致{morph_matches.__len__()}/{rows.__len__()}注"
+        one_line = f"开奖 {actual['开奖号码']} | 未命中 最近和差{min_sum_diff['和值差']}跨差{min_span_diff['跨度差']} | 形态一致{len(morph_matches)}/{len(rows)}注"
 
     return {
         '一句话摘要': one_line,

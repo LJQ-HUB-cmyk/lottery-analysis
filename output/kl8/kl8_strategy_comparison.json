@@ -1,0 +1,22 @@
+{
+  "lottery": "kl8",
+  "window": 30,
+  "strategies": {
+    "kl8_v1_hot12_cold8": {
+      "periods": 14,
+      "total_cost": 28,
+      "total_prize": 8,
+      "total_profit": -20,
+      "roi": -71.4,
+      "hit2": 1,
+      "hit3": 1,
+      "hit4": 0,
+      "hit_rate": 14.3,
+      "weighted_score": 8,
+      "weighted_avg": 0.57,
+      "pool_hit_avg": 5.29,
+      "max_miss_streak": 11
+    }
+  },
+  "generated_at": "2026-06-05 20:31:14"
+}

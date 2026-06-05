@@ -84,18 +84,54 @@ def load_weights(weight_path=None):
 #  生成000-999全部号码
 # ==========================================
 
+_cached_all_df = None
+
+
 def generate_all():
-    """生成000-999共1000个号码，复用 feature_engine.add_features 计算特征"""
+    """生成000-999共1000个号码，复用 feature_engine.add_features 计算特征。
+    结果缓存到模块级变量，避免回测/调参中重复计算。"""
+    global _cached_all_df
+    if _cached_all_df is not None:
+        return _cached_all_df.copy()
     from feature_engine import add_features
     nums = [(a, b, c) for a in range(10) for b in range(10) for c in range(10)]
     df = pd.DataFrame(nums, columns=['红球1', '红球2', '红球3'])
     df = add_features(df)
-    return df
+    _cached_all_df = df
+    return df.copy()
 
 
 # ==========================================
 #  评分函数
 # ==========================================
+
+def _score_frequency(value, theory_key, freq_key, weight, theory, window_30, window_5, params):
+    """通用频率评分：和值/跨度共用逻辑。返回 (score, desc_str)。"""
+    theory_dist = {int(k): v for k, v in theory.get(theory_key, {}).items()}
+    freq = theory_dist.get(value, 0)
+    max_freq = max(theory_dist.values()) if theory_dist and max(theory_dist.values()) > 0 else 1
+    theory_score = int(weight * freq / max_freq)
+
+    freq_30 = {int(k): v for k, v in window_30.get(freq_key, {}).items() if v}
+    if freq_30 and sum(freq_30.values()) > 0:
+        total_30 = sum(freq_30.values())
+        recent_ratio = freq_30.get(value, 0) / total_30
+        expected_ratio = theory_dist.get(value, 0) / 1000.0
+        recent_score = int(weight * min(recent_ratio / expected_ratio, 1.5) / 1.5) if expected_ratio > 0 else 0
+    else:
+        recent_score = 0
+    recent_score = min(recent_score, int(weight * 0.8))
+
+    freq_5 = {int(k): v for k, v in window_5.get(freq_key, {}).items() if v}
+    decay = 1.0
+    if freq_5.get(value, 0) >= 3:
+        decay = params['overheat_high']
+    elif freq_5.get(value, 0) >= 2:
+        decay = params['overheat_medium']
+
+    score = int((theory_score * 0.6 + recent_score * 0.4) * decay)
+    return score, f"{theory_key}={value}"
+
 
 def score_number(row, stats, theory, weights, params):
     """
@@ -116,58 +152,15 @@ def score_number(row, stats, theory, weights, params):
     hot_th = P.get('hot_threshold', 3)
 
     # ---- 1. 和值评分 ----
-    theory_sum = {int(k): v for k, v in theory.get('和值', {}).items()}
-    freq = theory_sum.get(s_val, 0)
-    max_freq = max(theory_sum.values()) if theory_sum and max(theory_sum.values()) > 0 else 1
-    theory_score = int(W['和值'] * freq / max_freq)
-
-    sum_freq_30 = {int(k): v for k, v in window_30.get('和值频率', {}).items() if v}
-    if sum_freq_30 and sum(sum_freq_30.values()) > 0:
-        total_30 = sum(sum_freq_30.values())
-        recent_ratio = sum_freq_30.get(s_val, 0) / total_30
-        expected_ratio = theory_sum.get(s_val, 0) / 1000.0
-        recent_score = int(W['和值'] * min(recent_ratio / expected_ratio, 1.5) / 1.5) if expected_ratio > 0 else 0
-    else:
-        recent_score = 0
-    recent_score = min(recent_score, int(W['和值'] * 0.8))
-
-    # 过热衰减
-    sum_freq_5 = {int(k): v for k, v in window_5.get('和值频率', {}).items() if v}
-    decay = 1.0
-    if sum_freq_5.get(s_val, 0) >= 3:
-        decay = P['overheat_high']
-    elif sum_freq_5.get(s_val, 0) >= 2:
-        decay = P['overheat_medium']
-
-    sum_score = int((theory_score * 0.6 + recent_score * 0.4) * decay)
-    details['和值'] = (sum_score, f"和值={s_val}")
+    sum_score, sum_desc = _score_frequency(
+        s_val, '和值', '和值频率', W['和值'], theory, window_30, window_5, P)
+    details['和值'] = (sum_score, sum_desc)
     total += sum_score
 
     # ---- 2. 跨度评分 ----
-    theory_span = {int(k): v for k, v in theory.get('跨度', {}).items()}
-    freq_s = theory_span.get(span_val, 0)
-    max_s = max(theory_span.values()) if theory_span and max(theory_span.values()) > 0 else 1
-    theory_score_s = int(W['跨度'] * freq_s / max_s)
-
-    span_freq_30 = {int(k): v for k, v in window_30.get('跨度频率', {}).items() if v}
-    if span_freq_30 and sum(span_freq_30.values()) > 0:
-        total_s30 = sum(span_freq_30.values())
-        recent_s_ratio = span_freq_30.get(span_val, 0) / total_s30
-        expected_s_ratio = theory_span.get(span_val, 0) / 1000.0
-        recent_score_s = int(W['跨度'] * min(recent_s_ratio / expected_s_ratio, 1.5) / 1.5) if expected_s_ratio > 0 else 0
-    else:
-        recent_score_s = 0
-    recent_score_s = min(recent_score_s, int(W['跨度'] * 0.8))
-
-    span_freq_5 = {int(k): v for k, v in window_5.get('跨度频率', {}).items() if v}
-    decay_s = 1.0
-    if span_freq_5.get(span_val, 0) >= 3:
-        decay_s = P['overheat_high']
-    elif span_freq_5.get(span_val, 0) >= 2:
-        decay_s = P['overheat_medium']
-
-    span_score = int((theory_score_s * 0.6 + recent_score_s * 0.4) * decay_s)
-    details['跨度'] = (span_score, f"跨度={span_val}")
+    span_score, span_desc = _score_frequency(
+        span_val, '跨度', '跨度频率', W['跨度'], theory, window_30, window_5, P)
+    details['跨度'] = (span_score, span_desc)
     total += span_score
 
     # ---- 3. 形态评分（回归惩罚：偏离理论双向扣分） ----
@@ -219,9 +212,9 @@ def score_number(row, stats, theory, weights, params):
     raw_missing = window_30.get('当前遗漏', {})
     latest_missing = {int(k): int(v) for k, v in raw_missing.items() if v is not None} if raw_missing else {}
 
+    cold_count = 0
+    hot_count = 0
     if latest_missing:
-        cold_count = 0
-        hot_count = 0
         for d in [row['红球1'], row['红球2'], row['红球3']]:
             m = latest_missing.get(d, 0)
             if m > cold_th:

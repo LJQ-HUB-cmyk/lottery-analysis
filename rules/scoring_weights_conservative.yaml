@@ -20,5 +20,5 @@ diversity:
   span_spread: 10
 
 overheat_decay:
-  high: 0.5
-  medium: 0.7
+  high: 0.7    # 从0.5放宽（O2：衰减过于激进导致号码频繁掉出Top30）
+  medium: 0.85 # 从0.7放宽

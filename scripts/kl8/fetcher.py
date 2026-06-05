@@ -15,7 +15,6 @@ import requests
 
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 CN_TZ = timezone(timedelta(hours=8))
 
@@ -92,6 +91,7 @@ def save_history(rows: list[dict]) -> Path:
 
 
 def save_latest(row: dict) -> Path:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     p = DATA_DIR / "kl8_latest.json"
     data = {
         "lottery": "kl8", "issue": row["issue"], "date": row["date"],

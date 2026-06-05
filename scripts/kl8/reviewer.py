@@ -7,6 +7,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scripts.kl8.common import parse_kl8_numbers
@@ -14,9 +16,24 @@ from scripts.kl8.common import parse_kl8_numbers
 BASE = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE / "data" / "kl8"
 OUTPUT_DIR = BASE / "output" / "kl8"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CN_TZ = timezone(timedelta(hours=8))
+
+
+def _load_kl8_prizes():
+    """从 rules/prizes.yaml 加载 KL8 选四奖金配置"""
+    prize_path = BASE / "rules" / "prizes.yaml"
+    if prize_path.exists():
+        with open(prize_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        kl8_cfg = cfg.get("kl8", {})
+        return kl8_cfg.get("选四", {4: 93, 3: 5, 2: 3, 1: 0, 0: 0}), kl8_cfg.get("单注成本", 2)
+    return {4: 93, 3: 5, 2: 3, 1: 0, 0: 0}, 2
+
+
+# 选四奖级表：命中数 → 奖金(元)
+PLAY4_PRIZES, COST_PER_BET = _load_kl8_prizes()
+
 
 def find_actual_by_issue(target_issue: str) -> dict | None:
     """在 history.csv 中按期号精确查找开奖数据"""
@@ -33,12 +50,6 @@ def find_actual_by_issue(target_issue: str) -> dict | None:
                     "numbers": parse_kl8_numbers(row.get("numbers", "")),
                 }
     return None
-
-
-# 选四奖级表：命中数 → 奖金(元)
-# 官方标准：中4=93元 中3=5元 中2=3元（派奖期间中4可能上调至100元）
-PLAY4_PRIZES = {4: 93, 3: 5, 2: 3, 1: 0, 0: 0}
-COST_PER_BET = 2
 
 
 def review(prediction: dict, actual: dict) -> dict:
@@ -90,6 +101,7 @@ def review(prediction: dict, actual: dict) -> dict:
 
 
 def save_review(data: dict) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     issue = data["issue"]
     p = OUTPUT_DIR / f"kl8_review_{issue}.json"
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

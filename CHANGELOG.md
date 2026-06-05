@@ -2,6 +2,18 @@
 
 > 集中式变更日志，按版本从新到旧排列。单日详细记录见 `docs/` 目录。
 
+## v2.18.0 (2026-06-05)
+
+- **实盘策略调优**：形态权重 12→16（修复 D3 组三全军覆没）；过热衰减 0.6/0.8→0.75/0.9（修复号码频繁掉出 Top30）；多样性 span_spread 8→5（修复跨差偏大）
+- **性能优化**：`feature_engine.py` 遗漏值计算重写为 numpy 批量版本；`scoring_engine.py` `generate_all()` 加模块级缓存；`stats_engine.py` 理论分布加模块级缓存
+- **Bug 修复**：`scoring_engine.py` `cold_count` 未定义风险；`compare_result.py` 期号类型统一为 str；`hermes_push.py` KL8 空 target 匹配漏洞；`compare_result.py` `__len__()` 改为 `len()`；`push_sender.py` 微信首次发送不再强制 sleep 5s
+- **代码重构**：`scoring_engine.py` 抽取 `_score_frequency()` 通用函数；`hermes_push.py` 拆分为 `push_formatter.py` + `push_sender.py` + 薄 CLI 入口；`backtest.py` `_build_freq` 移至循环外；KL8 5 个模块消除 import 时 `mkdir` 副作用
+- **KL8 完善**：新增 `backtest.py` 回测脚本；predictor `--zone-balance` 分区均衡约束；metrics 加权命中分（中四=93/中三=5/中二=3）；stats 全量 80 号码遗漏表；check `--stage predict|review|full` 参数；新增 `compare_strategies.py` 多策略对比
+- **数据源**：新增 `patch_pls_dates.py` 历史日期补全工具；`data_fetcher.py --verify-backup` 备份源验证
+- **推送增强**：`push_formatter.py` 增加奇偶/大小倾向展示
+- **工程化**：新增 `rules/prizes.yaml` 奖金配置；新增 `.github/workflows/daily.yml`；新增 `tests/` 目录（35 个测试）；`.gitignore` 加 `.pytest_cache/`
+- **清理**：删除 `_fetch_check.py`
+
 ## v2.17.0 (2026-05-25)
 
 - **auto_tuned 自动调参闭环**：`tune_scoring_params.py`（Optuna walk-forward）+ `audit_lottery_data.py`（数据审计）+ `report_tuning_status.py`（灰度观察）

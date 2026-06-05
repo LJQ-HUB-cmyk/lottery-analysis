@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 特征工程 v3 —— 含数据检查 + 分位遗漏 + group_number + 冷热
 ===========================================================
@@ -212,52 +212,48 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_missing_features(df: pd.DataFrame) -> pd.DataFrame:
-    """遗漏值计算（含分位遗漏）—— 向量化版本"""
-    n = len(df)
-    r1, r2, r3 = df['红球1'].values, df['红球2'].values, df['红球3'].values
-    
-    # ---- 全位遗漏：任一位置出现就算 ----
-    prefix = '遗漏'
-    for d in range(10):
-        df[f'{prefix}_{d}'] = 0
+def _compute_miss_matrix(values: np.ndarray, n: int) -> np.ndarray:
+    """计算单路遗漏矩阵 (n, 10)，纯 numpy 无逐元素赋值。"""
+    mat = np.zeros((n, 10), dtype=np.int32)
     current_miss = np.zeros(10, dtype=np.int32)
     for i in range(n):
-        appeared = {r1[i], r2[i], r3[i]}
+        vi = int(values[i])
+        current_miss += 1
+        current_miss[vi] = 0
+        mat[i] = current_miss
+    return mat
+
+
+def add_missing_features(df: pd.DataFrame) -> pd.DataFrame:
+    """遗漏值计算（含分位遗漏）—— numpy 批量版本"""
+    n = len(df)
+    r1, r2, r3 = df['红球1'].values, df['红球2'].values, df['红球3'].values
+
+    # ---- 全位遗漏：任一位置出现就算 ----
+    miss_all = np.zeros((n, 10), dtype=np.int32)
+    current_miss = np.zeros(10, dtype=np.int32)
+    for i in range(n):
+        current_miss += 1
+        current_miss[r1[i]] = 0
+        current_miss[r2[i]] = 0
+        current_miss[r3[i]] = 0
+        miss_all[i] = current_miss
+
+    for d in range(10):
+        df[f'遗漏_{d}'] = miss_all[:, d]
+
+    # ---- 分位遗漏 ----
+    for pre, vals in [('miss_bai', r1), ('miss_shi', r2), ('miss_ge', r3)]:
+        mat = _compute_miss_matrix(vals, n)
         for d in range(10):
-            if d in appeared:
-                current_miss[d] = 0
-            else:
-                current_miss[d] += 1
-        for d in range(10):
-            df.iloc[i, df.columns.get_loc(f'{prefix}_{d}')] = current_miss[d]
-    
-    # ---- 分位遗漏 ---- 
-    miss_cols_info = {  # (列名, 前缀, values)
-        'miss_bai': ('红球1', 'miss_bai', r1),
-        'miss_shi': ('红球2', 'miss_shi', r2),
-        'miss_ge':  ('红球3', 'miss_ge', r3),
-    }
-    for prefix, (col_name, pre, vals) in miss_cols_info.items():
-        for d in range(10):
-            df[f'{pre}_{d}'] = 0
-        current_miss = np.zeros(10, dtype=np.int32)
-        for i in range(n):
-            vi = int(vals[i])
-            for d in range(10):
-                if d == vi:
-                    current_miss[d] = 0
-                else:
-                    current_miss[d] += 1
-            for d in range(10):
-                df.iloc[i, df.columns.get_loc(f'{pre}_{d}')] = current_miss[d]
-    
+            df[f'{pre}_{d}'] = mat[:, d]
+
     # ---- 平均/最大遗漏 ----
     for label, pre in [('全位', '遗漏'), ('百位', 'miss_bai'), ('十位', 'miss_shi'), ('个位', 'miss_ge')]:
         miss_cols = [f'{pre}_{d}' for d in range(10)]
         df[f'avg_miss_{label}'] = df[miss_cols].mean(axis=1)
         df[f'max_miss_{label}'] = df[miss_cols].max(axis=1)
-    
+
     return df
 
 

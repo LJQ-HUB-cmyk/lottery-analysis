@@ -1,7 +1,7 @@
 # Hermes 定时任务配置
 
 > 此文件供 Hermes 读取并自动配置定时任务。修改此文件后，同步至 Hermes 平台生效。
-> 最后更新：2026-05-24（v2.16.0：单彩种独立推送 + 包装脚本通过薄入口调用）
+> 最后更新：2026-06-05（v2.18.0：性能优化 + hermes_push 拆分 + KL8 完善 + 测试）
 
 ---
 
@@ -144,7 +144,9 @@ Hermes / cron            → 定时触发
 ~/.hermes/scripts/*.sh   → 包装脚本（no_agent 要求脚本在此目录）
 scripts/push/*.sh        → 薄入口：切目录、加锁、日志、启动 Python
 scripts/jobs/*.py        → 业务编排：拉取、预测/复盘、状态判断、去重
-scripts/hermes_push.py   → 推送内容生成 + 去重 + 发送
+scripts/hermes_push.py   → CLI 入口（接口不变）
+  scripts/push_formatter.py → 推送内容生成（新增）
+  scripts/push_sender.py    → 去重 + 多通道发送（新增）
 output/status/*.json     → 每次任务的状态记录
 ```
 
@@ -173,7 +175,9 @@ output/status/*.json     → 每次任务的状态记录
 
 ---
 
-## 本次更新（v2.17.0）服务器部署步骤
+## 本次更新（v2.18.0）服务器部署步骤
+
+### 必做步骤（2 步）
 
 ```bash
 # 1. 拉取最新代码
@@ -182,25 +186,84 @@ git pull
 
 # 2. 同步 shell 脚本到 Hermes 目录
 cp scripts/push/*.sh ~/.hermes/scripts/
-
-# 3. 生成 auto_tuned 权重（只需跑一次）
-.venv/bin/python scripts/tune_scoring_params.py --lottery pls --trials 80 --periods 120 --train-window 150
-.venv/bin/python scripts/tune_scoring_params.py --lottery d3 --trials 80 --periods 120 --train-window 150
-
-# 4. 验证 auto_tuned 权重已生成
-ls -l rules/scoring_weights_auto_*.yaml
-
-# 5. 数据审计（确认数据没问题）
-.venv/bin/python scripts/audit_lottery_data.py --lottery all
-
-# 6. Hermes 平台更新定时任务
-# 删除旧任务: task-review-2135, task-review-2205, task-review-2310
-# 新增任务: task-review-prepare-2205, task-review-pls-2210, task-review-d3-2215
-# 修改任务: task-kl8-check（命令改为 bash scripts/push/kl8_check_push.sh, deliver=origin, no_agent=true）
-# 详见本文档"三、定时任务"章节
 ```
 
-### Hermes cron 变更对照
+**完成。** 以上两步即可运行。cron 任务配置不变，无需修改 Hermes 平台。
+
+### 可选验证（推荐）
+
+```bash
+# 3. 安装 pytest（仅用于本地测试，不影响 cron 运行）
+.venv/bin/pip install pytest
+
+# 4. 验证新模块可导入
+.venv/bin/python -c "from scripts.push_formatter import build_predict_message; print('OK')"
+.venv/bin/python -c "from scripts.push_sender import send_or_save; print('OK')"
+
+# 5. 跑测试
+.venv/bin/python -m pytest tests/ -q
+
+# 6. 跑一次主流程（不推送，仅验证）
+.venv/bin/python run_daily.py pls --top-k 5
+
+# 7. KL8 健康检查
+PYTHONUTF8=1 .venv/bin/python scripts/kl8/check.py
+```
+
+### 不需要做的事
+
+| 项目 | 原因 |
+|------|------|
+| 不需要改 cron 任务 | 8 个任务配置不变，shell 脚本路径不变 |
+| 不需要装新依赖 | 无新增 pip 包，`requirements.txt` 不变 |
+| 不需要重新调参 | `scoring_weights_auto_*.yaml` 已存在，权重微调在 YAML 中手动改 |
+| 不需要改环境变量 | `FEISHU_WEBHOOK_URL` 等不变 |
+| 不需要重跑数据 | 现有 raw/processed/cache 数据继续用 |
+| 不需要改 venv | Python 3.11+ 已满足所有语法要求 |
+
+### v2.18.0 新增/变更文件
+
+| 文件 | 状态 | 说明 |
+|------|:----:|------|
+| `scripts/push_formatter.py` | **新增** | 推送内容格式化（从 hermes_push 拆出） |
+| `scripts/push_sender.py` | **新增** | 多通道发送+去重+锁（从 hermes_push 拆出） |
+| `scripts/hermes_push.py` | **重写** | 薄 CLI 入口，调用上述两个模块（CLI 接口不变） |
+| `scripts/kl8/backtest.py` | **新增** | KL8 walk-forward 回测 |
+| `scripts/kl8/compare_strategies.py` | **新增** | KL8 多策略对比 |
+| `scripts/patch_pls_dates.py` | **新增** | PLS 历史日期补全工具 |
+| `rules/prizes.yaml` | **新增** | 各彩种奖金配置（backtest/reviewer 从此读取） |
+| `tests/` | **新增** | 35 个单元测试 |
+| `rules/scoring_weights*.yaml` | **修改** | 形态权重/过热衰减/跨度分散参数微调 |
+| `scripts/kl8/check.py` | **修改** | 新增 `--stage` 参数 + 期号比较逻辑修复 |
+| `scripts/kl8/predictor.py` | **修改** | 新增 `--zone-balance` + `duration_ms` |
+| `scripts/kl8/metrics.py` | **修改** | 新增加权命中分 |
+| `scripts/kl8/stats.py` | **修改** | 新增全量 80 号码遗漏表 |
+| `scripts/data_fetcher.py` | **修改** | 新增 `--verify-backup` 参数 |
+| `scripts/compare_result.py` | **修改** | 期号类型统一 + `__len__` 修复 |
+
+### 兼容性说明
+
+> `hermes_push.py` 已重写为薄入口——实际逻辑拆到了 `push_formatter.py` 和 `push_sender.py`。
+> 但 **CLI 接口完全不变**（`--mode predict/review`、`--lottery`、`--stdout`、`--force`、`--dedup-key` 等参数全保留），
+> 所以所有 shell 脚本和 Python job 的调用方式不需要改。
+
+---
+
+## 历史部署记录
+
+### v2.17.0（2026-05-25）
+
+```bash
+cd /home/admin/bendi/lottery-analysis && git pull
+cp scripts/push/*.sh ~/.hermes/scripts/
+# 生成 auto_tuned 权重（只需跑一次）
+.venv/bin/python scripts/tune_scoring_params.py --lottery pls --trials 80 --periods 120 --train-window 150
+.venv/bin/python scripts/tune_scoring_params.py --lottery d3 --trials 80 --periods 120 --train-window 150
+ls -l rules/scoring_weights_auto_*.yaml
+.venv/bin/python scripts/audit_lottery_data.py --lottery all
+```
+
+### v2.16.0（2026-05-24）
 
 | 旧任务 | 新任务 | 变化 |
 |------|------|------|

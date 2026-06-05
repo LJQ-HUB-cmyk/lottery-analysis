@@ -17,8 +17,8 @@ hot_cold:
 
 diversity:
   group_penalty: 10
-  span_spread: 15
+  span_spread: 10   # 从15降到10（O8：跨差偏大）
 
 overheat_decay:
-  high: 0.6
-  medium: 0.8
+  high: 0.75   # 从0.6放宽（O2）
+  medium: 0.9  # 从0.8放宽
