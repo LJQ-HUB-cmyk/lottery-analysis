@@ -151,12 +151,23 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5, strategy='d
         'conservative': {'weights': 'rules/scoring_weights_conservative.yaml', 'name': 'conservative'},
         'diversity':    {'weights': 'rules/scoring_weights_diversity.yaml',    'name': 'diversity'},
         'auto_tuned':   {'weights': f'rules/scoring_weights_auto_{lottery}.yaml', 'name': 'auto_tuned'},
+        'enhanced':     {'weights': None,                    'name': 'enhanced'},
     }
 
-    strategies = [strategy] if strategy != 'all' else ['default', 'conservative', 'diversity', 'auto_tuned']
+    all_strategies = ['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced']
+    strategies = [strategy] if strategy != 'all' else all_strategies
 
     for st in strategies:
         cfg = strategy_configs[st]
+        # enhanced 策略使用独立的增强预测器
+        if st == 'enhanced':
+            enhanced_cmd = [py, "scripts/enhanced_predictor.py", "--lottery", lottery,
+                           "--top-k", str(top_k), "--exclude-recent", str(exclude_recent)]
+            desc = f"{label} 增强预测 [enhanced] (top-k={top_k})"
+            if not run_cmd(enhanced_cmd, desc, timeout=120):
+                if strategy != 'all':
+                    return
+            continue
         wpath = Path(cfg['weights']) if cfg['weights'] else None
         if wpath and not wpath.exists():
             print(f"  [SKIP] {st} 权重文件不存在: {wpath}", file=sys.stderr)
@@ -202,7 +213,7 @@ def main():
                         help='推荐注数（默认30）')
     parser.add_argument('--exclude-recent', type=int, default=5,
                         help='排除近N期已出号码（默认5）')
-    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'all'],
+    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced', 'all'],
                         default='default',
                         help='评分策略：default/conservative/diversity/auto_tuned/all（默认default）')
     args = parser.parse_args()

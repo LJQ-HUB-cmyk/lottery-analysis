@@ -55,6 +55,7 @@ lottery-analysis/
 │   ├── feature_engine.py     # 特征工程（113维）+ 数据质量检查
 │   ├── stats_engine.py       # 多窗口统计 + 理论分布
 │   ├── scoring_engine.py     # 评分引擎v2（YAML权重 + 回归惩罚 + 多样性）
+│   ├── enhanced_predictor.py # 增强预测器v1（分位分析+和值区间+对子连号+热号池+动态权重）
 │   ├── backtest.py           # Walk-forward 回测（多策略对比 + ROI拆分）
 │   ├── compare_result.py     # 预测 vs 开奖对比 + review_history累加
 │   ├── review_summary.py     # 最近N期复盘表现摘要
