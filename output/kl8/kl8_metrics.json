@@ -11,31 +11,31 @@
     "hit4_count": 0,
     "hit_rate": 0.1429,
     "avg_pool_hit": 4.43,
-    "max_miss_streak": 5
+    "max_miss_streak": 4
   },
   "last30": {
-    "days": 14,
-    "total_cost": 28,
+    "days": 15,
+    "total_cost": 30,
     "total_prize": 8,
-    "total_profit": -20,
+    "total_profit": -22,
     "hit2_count": 1,
     "hit3_count": 1,
     "hit4_count": 0,
-    "hit_rate": 0.1429,
-    "avg_pool_hit": 5.29,
+    "hit_rate": 0.1333,
+    "avg_pool_hit": 5.27,
     "max_miss_streak": 11
   },
   "all": {
-    "days": 14,
-    "total_cost": 28,
+    "days": 15,
+    "total_cost": 30,
     "total_prize": 8,
-    "total_profit": -20,
+    "total_profit": -22,
     "hit2_count": 1,
     "hit3_count": 1,
     "hit4_count": 0,
-    "hit_rate": 0.1429,
-    "avg_pool_hit": 5.29,
+    "hit_rate": 0.1333,
+    "avg_pool_hit": 5.27,
     "max_miss_streak": 11
   },
-  "updated_at": "2026-06-03 22:20:05"
+  "updated_at": "2026-06-04 22:20:27"
 }
