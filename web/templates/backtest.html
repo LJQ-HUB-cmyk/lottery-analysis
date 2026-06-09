@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% set active = "backtest" %}
+{% block title %}回测中心 - 彩票分析{% endblock %}
+
+{% block content %}
+<h1 style="font-size:20px;margin-bottom:20px;color:var(--blue)">📊 回测中心</h1>
+
+{% for name, bt, lt in [("排列三", pls_bt, "pls"), ("福彩3D", d3_bt, "d3")] %}
+<div class="card" style="margin-bottom:20px">
+  <h2>{{ name }} Walk-Forward 回测</h2>
+  {% if bt and bt.get('结果') %}
+    {% set results = bt.get('结果', {}) %}
+    <p style="color:var(--text3);font-size:12px;margin-bottom:10px">
+      回测 {{ bt.get('回测期数','?') }}期 | Top-K {{ bt.get('top_k','?') }} | 训练窗口 {{ bt.get('训练窗口','?') }}期
+    </p>
+    <table>
+      <thead><tr>
+        <th>策略</th><th>直选命中</th><th>组选命中</th><th>平均注数</th><th>ROI</th><th>最长连未中</th>
+      </tr></thead>
+      <tbody>
+      {% for sname, sr in results.items() %}
+        <tr>
+          <td><strong>{{ sname }}</strong></td>
+          <td>{{ sr.get('直选命中','') }}</td>
+          <td>{{ sr.get('组选命中','') }}</td>
+          <td>{{ sr.get('平均注数','') }}</td>
+          <td style="color:{% if sr.get('ROI','').startswith('-') %}var(--red){% else %}var(--green){% endif %}">
+            {{ sr.get('ROI','') }}
+          </td>
+          <td>{{ sr.get('最大连续未中','') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div id="roi-chart-{{ lt }}" class="chart-sm" style="margin-top:15px"></div>
+  {% else %}
+    <p class="empty">暂无回测数据。运行 <code>python scripts/backtest.py --lottery {{ lt }} --periods 30</code> 生成。</p>
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- KL8 回测 -->
+<div class="card">
+  <h2>快乐8 回测</h2>
+  {% if kl8_bt and kl8_bt.get('results') %}
+    {% set results = kl8_bt.get('results', {}) %}
+    <table>
+      <thead><tr>
+        <th>策略</th><th>期数</th><th>投入</th><th>奖金</th><th>盈亏</th><th>ROI</th><th>池均命中</th>
+      </tr></thead>
+      <tbody>
+      {% for sname, sr in results.items() %}
+        <tr>
+          <td><strong>{{ sname }}</strong></td>
+          <td>{{ sr.get('periods','') }}</td>
+          <td>{{ sr.get('total_cost','') }}</td>
+          <td>{{ sr.get('total_prize','') }}</td>
+          <td style="color:{% if sr.get('total_profit',0) >= 0 %}var(--green){% else %}var(--red){% endif %}">
+            {% if sr.get('total_profit',0) > 0 %}+{% endif %}{{ sr.get('total_profit','') }}
+          </td>
+          <td>{{ sr.get('roi','') }}</td>
+          <td>{{ sr.get('avg_pool_hit','') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">暂无回测数据。运行 <code>python scripts/kl8/backtest.py --periods 30</code> 生成。</p>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  var configs = [
+    { id: 'roi-chart-pls', data: {{ pls_bt | tojson }} },
+    { id: 'roi-chart-d3', data: {{ d3_bt | tojson }} },
+  ];
+  configs.forEach(function(cfg) {
+    var el = document.getElementById(cfg.id);
+    if (!el || !cfg.data || !cfg.data['结果']) return;
+    var results = cfg.data['结果'];
+    var names = Object.keys(results);
+    var rois = names.map(function(n) {
+      var s = (results[n]['ROI'] || '0').replace('%','');
+      return parseFloat(s) || 0;
+    });
+    var colors = rois.map(function(v) { return v >= 0 ? '#34d399' : '#ef4444'; });
+    var chart = echarts.init(el);
+    chart.setOption({
+      tooltip: {},
+      grid: { left: 60, right: 20, bottom: 30, top: 10 },
+      xAxis: { type: 'category', data: names, axisLabel: { color: '#64748b' } },
+      yAxis: { type: 'value', axisLabel: { color: '#64748b', formatter: '{value}%' },
+               splitLine: { lineStyle: { color: '#1e293b' } } },
+      series: [{ type: 'bar', data: rois.map(function(v,i) { return { value: v, itemStyle: { color: colors[i] } }; } }]
+    });
+    window.addEventListener('resize', function() { chart.resize(); });
+  });
+})();
+</script>
+{% endblock %}

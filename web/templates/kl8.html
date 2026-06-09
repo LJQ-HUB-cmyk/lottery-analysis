@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set active = "kl8" %}
+{% block title %}快乐8 - 彩票分析{% endblock %}
+
+{% block content %}
+<h1 style="font-size:20px;margin-bottom:20px;color:var(--blue)">🎯 快乐8</h1>
+
+<!-- 预测 -->
+<div class="grid-2" style="margin-bottom:20px">
+  <div class="card">
+    <h2>今日预测</h2>
+    {% if pred %}
+      <p>预测期号：<strong>{{ pred.get('predicted_issue','?') }}</strong></p>
+      <p style="margin:10px 0">选四主推：
+        {% for n in pred.get('recommended_play4',[]) %}
+          <span class="kl8-ball kl8-play4">{{ "%02d"|format(n) }}</span>
+        {% endfor %}
+      </p>
+      <h3>20码候选池</h3>
+      <p>
+        {% for n in pred.get('candidate_pool',[]) %}
+          <span class="kl8-ball">{{ "%02d"|format(n) }}</span>
+        {% endfor %}
+      </p>
+      {% set z = pred.get('zone_distribution', {}) %}
+      <p style="margin-top:10px;color:var(--text2);font-size:13px">
+        分区：01-20:{{ z.get('01-20',0) }} &nbsp; 21-40:{{ z.get('21-40',0) }} &nbsp;
+        41-60:{{ z.get('41-60',0) }} &nbsp; 61-80:{{ z.get('61-80',0) }}
+      </p>
+    {% else %}
+      <p class="empty">暂无预测</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>最新复盘</h2>
+    {% if review %}
+      <p>期号：<strong>{{ review.get('issue','?') }}</strong></p>
+      <p>选四：
+        {% for n in review.get('recommended_play4',[]) %}
+          <span class="kl8-ball kl8-play4">{{ "%02d"|format(n) }}</span>
+        {% endfor %}
+      </p>
+      <p style="margin:10px 0">
+        命中：<strong>{{ review.get('play4_hit_count',0) }}/4</strong> → {{ review.get('result_level','?') }}
+      </p>
+      <p>奖金：{{ review.get('prize',0) }}元 | 成本：{{ review.get('cost',0) }}元 |
+        盈亏：<strong style="color:{% if review.get('profit',0) >= 0 %}var(--green){% else %}var(--red){% endif %}">
+          {% if review.get('profit',0) > 0 %}+{% endif %}{{ review.get('profit',0) }}元
+        </strong>
+      </p>
+      <p style="margin-top:10px;color:var(--text2)">20码池命中：{{ review.get('pool_hit_count',0) }}/20</p>
+    {% else %}
+      <p class="empty">暂无复盘</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 累计表现 -->
+{% if metrics and metrics.get('last7',{}).get('days',0) > 0 %}
+<div class="stat-cards">
+  {% set m = metrics.get('last7', {}) %}
+  <div class="stat-card">
+    <div class="label">近{{ m.get('days',0) }}期成本</div>
+    <div class="value blue">{{ m.get('total_cost',0) }}元</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">近{{ m.get('days',0) }}期奖金</div>
+    <div class="value green">{{ m.get('total_prize',0) }}元</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">累计盈亏</div>
+    <div class="value {% if m.get('total_profit',0) >= 0 %}green{% else %}red{% endif %}">
+      {% if m.get('total_profit',0) > 0 %}+{% endif %}{{ m.get('total_profit',0) }}元
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="label">中二/中三/中四</div>
+    <div class="value yellow">{{ m.get('hit2_count',0) }}/{{ m.get('hit3_count',0) }}/{{ m.get('hit4_count',0) }}</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- 热号/冷号 -->
+{% if stats %}
+<div class="grid-2">
+  <div class="card">
+    <h2>🔥 热号排行（近30期）</h2>
+    <div id="hot-chart" class="chart-sm"></div>
+  </div>
+  <div class="card">
+    <h2>❄️ 冷号排行（遗漏值）</h2>
+    <div id="cold-chart" class="chart-sm"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var stats = {{ stats | tojson }};
+  var freq = stats.get ? stats['当前遗漏'] : (stats['当前遗漏'] || {});
+
+  // 热号：按遗漏值排序（遗漏小=热）
+  var sorted = Object.entries(freq).sort(function(a,b) { return a[1] - b[1]; });
+  var hotNums = sorted.slice(0, 20).map(function(x) { return parseInt(x[0]); });
+  var hotVals = sorted.slice(0, 20).map(function(x) { return x[1]; });
+
+  var hotChart = echarts.init(document.getElementById('hot-chart'));
+  hotChart.setOption({
+    tooltip: {},
+    grid: { left: 40, right: 10, bottom: 30, top: 10 },
+    xAxis: { type: 'category', data: hotNums.map(function(n) { return String(n).padStart(2,'0'); }),
+             axisLabel: { color: '#64748b' } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#1e293b' } },
+             name: '遗漏', nameTextStyle: { color: '#64748b' } },
+    series: [{ type: 'bar', data: hotVals, itemStyle: { color: '#ef4444' } }]
+  });
+
+  // 冷号：按遗漏值排序（遗漏大=冷）
+  var coldSorted = Object.entries(freq).sort(function(a,b) { return b[1] - a[1]; });
+  var coldNums = coldSorted.slice(0, 20).map(function(x) { return parseInt(x[0]); });
+  var coldVals = coldSorted.slice(0, 20).map(function(x) { return x[1]; });
+
+  var coldChart = echarts.init(document.getElementById('cold-chart'));
+  coldChart.setOption({
+    tooltip: {},
+    grid: { left: 40, right: 10, bottom: 30, top: 10 },
+    xAxis: { type: 'category', data: coldNums.map(function(n) { return String(n).padStart(2,'0'); }),
+             axisLabel: { color: '#64748b' } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#1e293b' } },
+             name: '遗漏', nameTextStyle: { color: '#64748b' } },
+    series: [{ type: 'bar', data: coldVals, itemStyle: { color: '#38bdf8' } }]
+  });
+
+  window.addEventListener('resize', function() { hotChart.resize(); coldChart.resize(); });
+})();
+</script>
+{% endif %}
+{% endblock %}

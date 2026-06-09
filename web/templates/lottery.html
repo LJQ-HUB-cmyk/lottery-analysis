@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set active = lottery %}
+{% block title %}{{ lottery_name }} - 彩票分析{% endblock %}
+
+{% block content %}
+<h1 style="font-size:20px;margin-bottom:20px;color:var(--blue)">{{ lottery_name }}</h1>
+
+<!-- 最新复盘 -->
+<div class="card" style="margin-bottom:20px">
+  <h2>🎰 最新复盘</h2>
+  {% if compare and compare.get('开奖详情') %}
+    {% set draw = compare.get('开奖详情', {}) %}
+    {% set hit = compare.get('命中情况', {}) %}
+    {% set best = compare.get('最佳逼近', {}) %}
+    <div class="draw-numbers">
+      <span>{{ draw.get('号码','?')[0] }}</span>
+      <span>{{ draw.get('号码','?')[1] }}</span>
+      <span>{{ draw.get('号码','?')[2] }}</span>
+    </div>
+    <p style="text-align:center;color:var(--text2)">
+      {{ draw.get('形态','') }} | 和值 {{ draw.get('和值','') }} | 跨度 {{ draw.get('跨度','') }}
+    </p>
+    <div style="display:flex;justify-content:center;gap:30px;margin-top:15px">
+      <div>
+        {% if hit.get('直选命中') %}<span class="hit">🎯 直选命中 #{{ hit.get('直选最佳排名','') }}</span>
+        {% else %}<span class="miss">直选未命中</span>{% endif %}
+      </div>
+      <div>
+        {% if hit.get('组选命中') %}<span class="hit">✅ 组选命中 #{{ hit.get('组选最佳排名','') }}</span>
+        {% else %}<span class="miss">组选未命中</span>{% endif %}
+      </div>
+      <div>
+        <span style="color:var(--text2)">最佳逼近：和差{{ best.get('最小和值差','?') }} 跨差{{ best.get('最小跨度差','?') }}</span>
+      </div>
+    </div>
+  {% else %}
+    <p class="empty">等待开奖</p>
+  {% endif %}
+</div>
+
+<!-- 预测表格 -->
+<div class="card" style="margin-bottom:20px">
+  <h2>🎯 预测 Top30</h2>
+  <p style="color:var(--text3);font-size:12px;margin-bottom:10px">
+    预测期号 {{ pred.get('预测期号','?') }} | 评分时间 {{ pred.get('评分时间','?') }}
+  </p>
+  <table>
+    <thead><tr><th>#</th><th>号码</th><th>组选</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
+    <tbody>
+    {% for r in pred.get('推荐', [])[:30] %}
+      <tr>
+        <td>{{ r.get('排名','') }}</td>
+        <td class="num">{{ r.get('号码','') }}</td>
+        <td>{{ r.get('group_number','') }}</td>
+        <td>{{ r.get('和值','') }}</td>
+        <td>{{ r.get('跨度','') }}</td>
+        <td>{{ r.get('形态','') }}</td>
+        <td class="score">{{ r.get('总分','') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 历史命中图表 -->
+<div class="card">
+  <h2>📈 近期误差趋势</h2>
+  <div id="error-chart" class="chart"></div>
+</div>
+
+<script>
+(function() {
+  var chart = echarts.init(document.getElementById('error-chart'));
+  var data = {{ history | tojson }};
+  var issues = data.map(function(r) { return r['期号'] || ''; });
+  var sumErrs = data.map(function(r) { return parseInt(r['Top1和值误差'] || 0); });
+  var spanErrs = data.map(function(r) { return parseInt(r['Top1跨度误差'] || 0); });
+
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['和值差', '跨度差'], textStyle: { color: '#94a3b8' }, top: 0 },
+    grid: { left: 40, right: 20, bottom: 40, top: 40 },
+    xAxis: { type: 'category', data: issues, axisLabel: { color: '#64748b', rotate: 45, fontSize: 10 } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    series: [
+      { name: '和值差', type: 'bar', data: sumErrs, itemStyle: { color: '#38bdf8' } },
+      { name: '跨度差', type: 'bar', data: spanErrs, itemStyle: { color: '#a78bfa' } },
+    ]
+  });
+  window.addEventListener('resize', function() { chart.resize(); });
+})();
+</script>
+{% endblock %}

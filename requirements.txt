@@ -10,3 +10,6 @@ lxml             # pd.read_html 加速（福彩3D抓取）
 beautifulsoup4   # 备用 HTML 解析
 openpyxl
 optuna            # 可选，未安装时 tune_scoring_params.py 仅支持 --method random
+fastapi           # Web 仪表板
+uvicorn           # ASGI 服务器
+jinja2            # 模板引擎

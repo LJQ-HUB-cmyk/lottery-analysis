@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% set active = "home" %}
+{% block title %}彩票分析仪表板{% endblock %}
+
+{% block content %}
+<!-- 统计卡片 -->
+<div class="stat-cards">
+  <div class="stat-card">
+    <div class="label">排列三 组选命中率</div>
+    <div class="value {% if stats.pls.group_rate > 20 %}green{% else %}yellow{% endif %}">{{ stats.pls.group_rate }}%</div>
+    <div class="label">近{{ stats.pls.n }}期</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">福彩3D 组选命中率</div>
+    <div class="value {% if stats.d3.group_rate > 20 %}green{% else %}yellow{% endif %}">{{ stats.d3.group_rate }}%</div>
+    <div class="label">近{{ stats.d3.n }}期</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">排列三 形态一致率</div>
+    <div class="value blue">{{ stats.pls.morph_rate }}%</div>
+    <div class="label">近{{ stats.pls.n }}期</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">福彩3D 形态一致率</div>
+    <div class="value blue">{{ stats.d3.morph_rate }}%</div>
+    <div class="label">近{{ stats.d3.n }}期</div>
+  </div>
+</div>
+
+<!-- 最新复盘 -->
+<div class="grid-2" style="margin-bottom:20px">
+  <div class="card">
+    <h2>🎰 排列三 最新复盘</h2>
+    {% if pls_compare and pls_compare.get('开奖详情') %}
+      {% set draw = pls_compare.get('开奖详情', {}) %}
+      {% set hit = pls_compare.get('命中情况', {}) %}
+      <div class="draw-numbers">
+        <span>{{ draw.get('号码','?')[0] }}</span>
+        <span>{{ draw.get('号码','?')[1] }}</span>
+        <span>{{ draw.get('号码','?')[2] }}</span>
+      </div>
+      <p style="text-align:center;color:var(--text2)">
+        {{ draw.get('形态','') }} | 和值 {{ draw.get('和值','') }} | 跨度 {{ draw.get('跨度','') }}
+      </p>
+      <p style="text-align:center;margin-top:10px">
+        {% if hit.get('直选命中') %}<span class="hit">🎯 直选命中 #{{ hit.get('直选最佳排名','') }}</span>
+        {% elif hit.get('组选命中') %}<span class="hit">✅ 组选命中 #{{ hit.get('组选最佳排名','') }}</span>
+        {% else %}<span class="miss">❌ 未命中</span>{% endif %}
+      </p>
+    {% else %}
+      <p class="empty">等待开奖</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>🎰 福彩3D 最新复盘</h2>
+    {% if d3_compare and d3_compare.get('开奖详情') %}
+      {% set draw = d3_compare.get('开奖详情', {}) %}
+      {% set hit = d3_compare.get('命中情况', {}) %}
+      <div class="draw-numbers">
+        <span>{{ draw.get('号码','?')[0] }}</span>
+        <span>{{ draw.get('号码','?')[1] }}</span>
+        <span>{{ draw.get('号码','?')[2] }}</span>
+      </div>
+      <p style="text-align:center;color:var(--text2)">
+        {{ draw.get('形态','') }} | 和值 {{ draw.get('和值','') }} | 跨度 {{ draw.get('跨度','') }}
+      </p>
+      <p style="text-align:center;margin-top:10px">
+        {% if hit.get('直选命中') %}<span class="hit">🎯 直选命中 #{{ hit.get('直选最佳排名','') }}</span>
+        {% elif hit.get('组选命中') %}<span class="hit">✅ 组选命中 #{{ hit.get('组选最佳排名','') }}</span>
+        {% else %}<span class="miss">❌ 未命中</span>{% endif %}
+      </p>
+    {% else %}
+      <p class="empty">等待开奖</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 预测 Top5 -->
+<div class="grid-2">
+  <div class="card">
+    <h2>🎯 排列三 Top5 预测</h2>
+    <table>
+      <thead><tr><th>#</th><th>号码</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
+      <tbody>
+      {% for r in pls_pred.get('推荐', [])[:5] %}
+        <tr>
+          <td>{{ r.get('排名','') }}</td>
+          <td class="num">{{ r.get('号码','') }}</td>
+          <td>{{ r.get('和值','') }}</td>
+          <td>{{ r.get('跨度','') }}</td>
+          <td>{{ r.get('形态','') }}</td>
+          <td class="score">{{ r.get('总分','') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p style="margin-top:10px;text-align:right"><a href="/lottery/pls">查看全部 →</a></p>
+  </div>
+
+  <div class="card">
+    <h2>🎯 福彩3D Top5 预测</h2>
+    <table>
+      <thead><tr><th>#</th><th>号码</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
+      <tbody>
+      {% for r in d3_pred.get('推荐', [])[:5] %}
+        <tr>
+          <td>{{ r.get('排名','') }}</td>
+          <td class="num">{{ r.get('号码','') }}</td>
+          <td>{{ r.get('和值','') }}</td>
+          <td>{{ r.get('跨度','') }}</td>
+          <td>{{ r.get('形态','') }}</td>
+          <td class="score">{{ r.get('总分','') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p style="margin-top:10px;text-align:right"><a href="/lottery/d3">查看全部 →</a></p>
+  </div>
+</div>
+
+<!-- 快乐8概览 -->
+<div class="card" style="margin-top:20px">
+  <h2>🎯 快乐8 预测</h2>
+  {% if kl8_pred %}
+    <p>预测期号：<strong>{{ kl8_pred.get('predicted_issue','?') }}</strong></p>
+    <p style="margin:10px 0">选四主推：
+      {% for n in kl8_pred.get('recommended_play4',[]) %}
+        <span class="kl8-ball kl8-play4">{{ "%02d"|format(n) }}</span>
+      {% endfor %}
+    </p>
+    <p>20码池：
+      {% for n in kl8_pred.get('candidate_pool',[]) %}
+        <span class="kl8-ball">{{ "%02d"|format(n) }}</span>
+      {% endfor %}
+    </p>
+    <p style="margin-top:10px;text-align:right"><a href="/kl8">查看详情 →</a></p>
+  {% else %}
+    <p class="empty">暂无预测</p>
+  {% endif %}
+</div>
+{% endblock %}
