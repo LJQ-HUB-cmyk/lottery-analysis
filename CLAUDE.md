@@ -50,6 +50,7 @@
 ```
 lottery-analysis/
 ├── run_daily.py              # 一键每日运行入口
+├── run_web.py                # Web 仪表板启动器
 ├── scripts/
 │   ├── data_fetcher.py       # 多源数据抓取（js-lottery/eastmoney主源 + sporttery/zhcw备用 + 熔断 + 校验）
 │   ├── feature_engine.py     # 特征工程（113维）+ 数据质量检查
@@ -70,6 +71,7 @@ lottery-analysis/
 │   ├── issue_utils.py         # 期号标准化（PLS/D3格式互转）
 │   ├── source_health.py       # 数据源健康报告
 │   ├── hermes_push.py         # 两段式推送 CLI 入口（调用 push_formatter + push_sender）
+│   ├── build_dashboard.py     # 静态 HTML 仪表板生成器（备用）
 │   ├── push_formatter.py      # 推送内容格式化（预测/复盘/KL8/健康报告）
 │   ├── push_sender.py         # 多通道发送（飞书/微信/webhook）+ 去重 + 锁
 │   ├── kl8/                    # 快乐8独立模块
@@ -108,6 +110,11 @@ lottery-analysis/
 │   ├── cache/       # 统计缓存 + 熔断状态（git忽略）
 │   ├── kl8/         # 快乐8历史数据 + latest JSON
 │   └── quarantine/  # 坏数据隔离区（git忽略）
+├── web/                  # Web 仪表板（FastAPI + Jinja2 + ECharts）
+│   ├── main.py           # FastAPI 入口
+│   ├── routes/           # API 路由（pls/d3/kl8/backtest）
+│   ├── templates/        # Jinja2 HTML 模板
+│   └── static/           # 静态资源
 ├── tests/                # 单元测试（pytest）
 └── output/
     ├── predictions/ # 预测JSON
@@ -257,6 +264,16 @@ python scripts/tune_scoring_params.py --lottery d3 --trials 80 --periods 120
 ### 可视化
 
 ```bash
+# Web 仪表板（主）— FastAPI + ECharts，5 个页面
+python run_web.py                                    # 启动 → http://127.0.0.1:8000
+python run_web.py --port 9000                        # 指定端口
+python run_web.py --no-open                          # 不自动打开浏览器
+
+# 静态 HTML（备用）— 单文件，不需要启动服务器
+python scripts/build_dashboard.py                    # 生成 output/dashboard.html
+python scripts/build_dashboard.py --open             # 生成后自动打开浏览器
+
+# 走势图（matplotlib + plotly）
 python scripts/visualize.py --lottery pls --chart all
 python scripts/visualize.py --lottery pls --chart trend --output-format html
 ```

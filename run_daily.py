@@ -276,9 +276,6 @@ def main():
         logger.info(f"── 复盘摘要 ──")
         run_cmd([py, "scripts/review_summary.py"], "复盘表现摘要", timeout=30)
 
-    # 生成可视化仪表板
-    run_cmd([py, "scripts/build_dashboard.py"], "生成可视化仪表板", timeout=30)
-
     logger.info(f"")
     logger.info(f"{'='*50}")
     logger.info(f"  ✅ 全部任务完成！")
@@ -287,6 +284,7 @@ def main():
     if args.mode in ('review', 'all'):
         logger.info(f"  复盘报告: {BASE / 'output' / 'reports/'}")
         logger.info(f"  复盘总表: {BASE / 'output' / 'reviews/'}")
+    logger.info(f"  可视化: python run_web.py → http://127.0.0.1:8000")
     logger.info(f"{'='*50}")
 
 
