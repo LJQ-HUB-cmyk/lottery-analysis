@@ -275,6 +275,7 @@ def main():
         logger.info(f"")
         logger.info(f"── 复盘摘要 ──")
         run_cmd([py, "scripts/review_summary.py"], "复盘表现摘要", timeout=30)
+        run_cmd([py, "scripts/metrics.py"], "命中率统计", timeout=30)
 
     logger.info(f"")
     logger.info(f"{'='*50}")

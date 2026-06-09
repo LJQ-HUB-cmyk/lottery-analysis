@@ -291,6 +291,32 @@ def append_to_history(report, lottery, strategy='default'):
     else:
         hit_range = '未命中'
 
+    # 胆码分析：从 Top10 提取高频数字作为胆码
+    danma_hit = 0
+    actual_digits = set(int(d) for d in report['开奖号码'])
+    top10_nums = [r['预测号码'] for r in all_rows[:10]]
+    if top10_nums:
+        from collections import Counter
+        digit_freq = Counter()
+        for num in top10_nums:
+            for d in num:
+                digit_freq[int(d)] += 1
+        # 取频率最高的 3 个数字作为胆码
+        danma = [d for d, _ in digit_freq.most_common(3)]
+        danma_hit = sum(1 for d in danma if d in actual_digits)
+
+    # 和值/跨度/形态命中
+    actual_sum = sum(int(d) for d in report['开奖号码'])
+    actual_span = max(int(d) for d in report['开奖号码']) - min(int(d) for d in report['开奖号码'])
+    actual_morph = report['开奖详情'].get('形态', '')
+
+    # 和值命中：Top1 和值差 ≤ 2
+    sum_hit = abs(int(top1.get('和值差', 99))) <= 2 if top1 else False
+    # 跨度命中：Top1 跨度差 ≤ 1
+    span_hit = abs(int(top1.get('跨度差', 99))) <= 1 if top1 else False
+    # 形态命中
+    morph_hit = bool(top1.get('形态一致', False)) if top1 else False
+
     row = {
         '策略': strategy,
         '彩种': report['彩种'],
@@ -307,6 +333,10 @@ def append_to_history(report, lottery, strategy='default'):
         'Top1和值误差': top1.get('和值差', ''),
         'Top1跨度误差': top1.get('跨度差', ''),
         'Top1形态一致': top1.get('形态一致', ''),
+        '胆码命中': danma_hit,
+        '和值命中': sum_hit,
+        '跨度命中': span_hit,
+        '形态命中': morph_hit,
         '复盘时间': now,
     }
 

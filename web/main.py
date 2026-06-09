@@ -26,12 +26,13 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="stati
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
 # 注册路由
-from web.routes import pls, d3, kl8, backtest  # noqa: E402
+from web.routes import pls, d3, kl8, backtest, metrics  # noqa: E402
 
 app.include_router(pls.router, prefix="/api/pls", tags=["排列三"])
 app.include_router(d3.router, prefix="/api/d3", tags=["福彩3D"])
 app.include_router(kl8.router, prefix="/api/kl8", tags=["快乐8"])
 app.include_router(backtest.router, prefix="/api/backtest", tags=["回测"])
+app.include_router(metrics.router, prefix="/api/metrics", tags=["命中率"])
 
 
 # ── 页面路由 ─────────────────────────────────────────
@@ -51,6 +52,11 @@ async def index(request: Request):
     # 加载最新复盘
     pls_compare = read_json(BASE / "output" / "reports" / "pls_compare_latest.json")
     d3_compare = read_json(BASE / "output" / "reports" / "d3_compare_latest.json")
+
+    # 加载命中率指标
+    metrics_dir = BASE / "output" / "metrics"
+    pls_metrics = read_json(metrics_dir / "pls_metrics.json")
+    d3_metrics = read_json(metrics_dir / "d3_metrics.json")
 
     # 计算命中率（从 review_history）
     history = read_review_csv()
@@ -86,6 +92,8 @@ async def index(request: Request):
             "d3_pred": d3_pred,
             "kl8_pred": kl8_pred,
             "pls_compare": pls_compare,
+            "pls_metrics": pls_metrics,
+            "d3_metrics": d3_metrics,
             "d3_compare": d3_compare,
             "stats": stats,
             "push_predict": push_predict,
