@@ -160,8 +160,12 @@ async def backtest_page(request: Request):
     """回测中心"""
     from web.routes.helpers import read_json
 
-    pls_bt = read_json(BASE / "output" / "backtests" / "pls_backtest_latest.json")
-    d3_bt = read_json(BASE / "output" / "backtests" / "d3_backtest_latest.json")
+    # 回测文件带时间戳，取最新的
+    bt_dir = BASE / "output" / "backtests"
+    pls_files = sorted(bt_dir.glob("pls_backtest_*.json"), reverse=True)
+    d3_files = sorted(bt_dir.glob("d3_backtest_*.json"), reverse=True)
+    pls_bt = read_json(pls_files[0]) if pls_files else {}
+    d3_bt = read_json(d3_files[0]) if d3_files else {}
     kl8_bt = read_json(BASE / "output" / "kl8" / "kl8_backtest.json")
 
     return templates.TemplateResponse(
