@@ -276,6 +276,9 @@ def main():
         logger.info(f"── 复盘摘要 ──")
         run_cmd([py, "scripts/review_summary.py"], "复盘表现摘要", timeout=30)
 
+    # 生成可视化仪表板
+    run_cmd([py, "scripts/build_dashboard.py"], "生成可视化仪表板", timeout=30)
+
     logger.info(f"")
     logger.info(f"{'='*50}")
     logger.info(f"  ✅ 全部任务完成！")
