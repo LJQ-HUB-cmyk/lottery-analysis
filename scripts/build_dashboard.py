@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 可视化仪表板生成器
@@ -163,8 +163,8 @@ def build_review_section(history):
         if n == 0:
             continue
 
-        direct = sum(1 for r in recent if r.get('直选命中Top30', '').lower() in ('true', '1'))
-        group = sum(1 for r in recent if r.get('组选命中Top30', '').lower() in ('true', '1'))
+        direct = sum(1 for r in recent if r.get('直选命中Top10', r.get('直选命中Top30', '').lower() in ('true', '1'))
+        group = sum(1 for r in recent if r.get('组选命中Top10', r.get('组选命中Top30', '').lower() in ('true', '1'))
         morph = sum(1 for r in recent if r.get('Top1形态一致', '').lower() in ('true', '1'))
 
         sum_errs = [int(r.get('Top1和值误差', 0) or 0) for r in recent]
@@ -182,7 +182,7 @@ def build_review_section(history):
         cumulative_hit = []
         running = 0
         for i, r in enumerate(recent):
-            if r.get('组选命中Top30', '').lower() in ('true', '1'):
+            if r.get('组选命中Top10', r.get('组选命中Top30', '').lower() in ('true', '1'):
                 running += 1
             cumulative_hit.append(round(running / (i + 1) * 100, 1))
 

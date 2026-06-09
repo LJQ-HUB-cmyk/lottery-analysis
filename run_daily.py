@@ -239,8 +239,8 @@ def main():
     parser.add_argument('--mode', choices=['predict', 'review', 'all'],
                         default='predict',
                         help='运行模式：predict=仅预测 / review=仅复盘 / all=复盘+预测（默认predict）')
-    parser.add_argument('--top-k', type=int, default=30,
-                        help='推荐注数（默认30）')
+    parser.add_argument('--top-k', type=int, default=10,
+                        help='推荐注数（默认10）')
     parser.add_argument('--exclude-recent', type=int, default=5,
                         help='排除近N期已出号码（默认5）')
     parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced', 'all'],

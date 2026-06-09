@@ -335,7 +335,7 @@ def main():
     parser.add_argument('--lottery', required=True, choices=['pls', 'd3'])
     parser.add_argument('--periods', type=int, default=100,
                         help='回测期数')
-    parser.add_argument('--top-k', type=int, default=30,
+    parser.add_argument('--top-k', type=int, default=10,
                         help='推荐注数')
     parser.add_argument('--train-window', type=int, default=100,
                         help='训练窗口期数')

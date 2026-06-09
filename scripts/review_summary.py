@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 复盘表现摘要（按策略拆分）
 ==========================
@@ -67,12 +67,12 @@ def summarize_strategy(sub, strategy_name, window):
     sub = sub.tail(window)
     n = len(sub)
 
-    direct_hits = hit_count(sub['直选命中Top30'])
-    group_hits = hit_count(sub['组选命中Top30'])
+    direct_hits = hit_count(sub.get('直选命中Top10', sub.get('直选命中Top30', pd.Series())))
+    group_hits = hit_count(sub.get('组选命中Top10', sub.get('组选命中Top30', pd.Series())))
     shape_hits = hit_count(sub['Top1形态一致'])
 
-    direct_rate = pct(sub['直选命中Top30'])
-    group_rate = pct(sub['组选命中Top30'])
+    direct_rate = pct(sub.get('直选命中Top10', sub.get('直选命中Top30', pd.Series())))
+    group_rate = pct(sub.get('组选命中Top10', sub.get('组选命中Top30', pd.Series())))
     shape_rate = pct(sub['Top1形态一致'])
 
     sum_err = pd.to_numeric(sub['Top1和值误差'], errors='coerce').mean()
@@ -81,8 +81,8 @@ def summarize_strategy(sub, strategy_name, window):
     lines = [
         f"",
         f"  【{strategy_name}】最近 {n} 期",
-        f"  Top30 直选命中 : {direct_hits:>3} 次 / {n} 期 = {direct_rate:.1%}",
-        f"  Top30 组选命中 : {group_hits:>3} 次 / {n} 期 = {group_rate:.1%}",
+        f"  Top10 直选命中 : {direct_hits:>3} 次 / {n} 期 = {direct_rate:.1%}",
+        f"  Top10 组选命中 : {group_hits:>3} 次 / {n} 期 = {group_rate:.1%}",
         f"  Top1 形态一致  : {shape_hits:>3} 次 / {n} 期 = {shape_rate:.1%}",
         f"  Top1 平均和值差: {sum_err:.1f}",
         f"  Top1 平均跨度差: {span_err:.1f}",
@@ -91,8 +91,8 @@ def summarize_strategy(sub, strategy_name, window):
     if n >= 5:
         recent_5 = sub.tail(5)
         lines.append(
-            f"  最近5期趋势: 直选{pct(recent_5['直选命中Top30']):.1%} | "
-            f"组选{pct(recent_5['组选命中Top30']):.1%}"
+            f"  最近5期趋势: 直选{pct(recent_5['直选命中Top10']):.1%} | "
+            f"组选{pct(recent_5['组选命中Top10']):.1%}"
         )
 
     return lines

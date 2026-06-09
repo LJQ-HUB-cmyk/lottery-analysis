@@ -163,7 +163,7 @@ def build_ensemble(lottery):
         ],
         "摘要": {
             "Top10号码": top30_nums[:10],
-            "Top30号码": top30_nums,
+            "Top10号码": top30_nums,
             "总分最高": round(ranked[0][1], 2) if ranked else 0,
             "融合前策略数": len(strategy_nums),
         },

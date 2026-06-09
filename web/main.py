@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 彩票分析 Web 仪表板
@@ -59,8 +59,8 @@ async def index(request: Request):
         rows = [r for r in history if r.get("彩种") == lt_name and r.get("策略") == "default"]
         recent = rows[-30:]
         n = len(recent) or 1
-        direct = sum(1 for r in recent if r.get("直选命中Top30", "").lower() in ("true", "1"))
-        group = sum(1 for r in recent if r.get("组选命中Top30", "").lower() in ("true", "1"))
+        direct = sum(1 for r in recent if r.get("直选命中Top10", r.get("直选命中Top30", "").lower() in ("true", "1"))
+        group = sum(1 for r in recent if r.get("组选命中Top10", r.get("组选命中Top30", "").lower() in ("true", "1"))
         morph = sum(1 for r in recent if r.get("Top1形态一致", "").lower() in ("true", "1"))
         stats[lt_key] = {
             "n": len(recent),

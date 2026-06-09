@@ -297,10 +297,10 @@ def apply_diversity(scored, weights, params):
             d = detail['多样性']
             detail['多样性'] = (d[0], "组选唯一")
 
-    # 跨度促进：给Top-30中不常见的跨度加分
-    top_30 = sorted(scored, key=lambda x: x['总分'], reverse=True)[:30]
+    # 跨度促进：给Top-10中不常见的跨度加分
+    top_10 = sorted(scored, key=lambda x: x['总分'], reverse=True)[:10]
     span_counts = {}
-    for c in top_30:
+    for c in top_10:
         sv = c['跨度值']
         span_counts[sv] = span_counts.get(sv, 0) + 1
 
@@ -468,7 +468,7 @@ def main():
     parser = argparse.ArgumentParser(description='动态评分引擎 v2')
     parser.add_argument('--lottery', required=True, choices=['pls', 'd3'],
                         help='彩种')
-    parser.add_argument('--top-k', type=int, default=30,
+    parser.add_argument('--top-k', type=int, default=10,
                         help='推荐注数')
     parser.add_argument('--exclude-recent', type=int, default=5,
                         help='排除近N期已出号码')
@@ -577,7 +577,6 @@ def main():
             'P95分数线': p95_score,
             'P95候选数': p95_count,
             'Top10号码': [c['号码'] for c in scored[:10]],
-            'Top30号码': [c['号码'] for c in scored[:30]],
         }
 
         print(f"\n  📊 摘要:")

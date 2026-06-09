@@ -435,7 +435,7 @@ def predict_enhanced(lottery: str, top_k: int = 30,
         },
         '摘要': {
             'Top10号码': [c['号码'] for c in top_k_result[:10]],
-            'Top30号码': [c['号码'] for c in top_k_result[:30]],
+            'Top10号码': [c['号码'] for c in top_k_result[:30]],
             '候选总数': len(scored),
             '分位候选数': len(pos_candidates),
             '热号池候选数': len(pool_candidates),

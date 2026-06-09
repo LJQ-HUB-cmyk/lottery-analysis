@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 推送内容格式化模块
@@ -188,13 +188,13 @@ def extract_top10(data: dict, key: str = "Top10号码") -> list[str]:
 
 
 def extract_topn(data: dict, n: int = 30) -> list[str]:
-    """从预测 JSON 提取 TopN 号码列表。依次尝试 Top30/Top20/Top10 字段。"""
+    """从预测 JSON 提取 TopN 号码列表。依次尝试 Top10/Top20/Top10 字段。"""
     if not data:
         return []
     summary = data.get("摘要", {})
     nums = (
-        summary.get("Top30号码")
-        or summary.get("Top20号码")
+        summary.get("Top10号码")
+        or summary.get("Top10号码")
         or summary.get("Top10号码")
         or []
     )
@@ -202,7 +202,7 @@ def extract_topn(data: dict, n: int = 30) -> list[str]:
 
 
 def top_digits(recommends: list, k: int = 5) -> str:
-    """从 Top30 推荐里统计数字频率，取前 k 个高频数字。"""
+    """从 Top10 推荐里统计数字频率，取前 k 个高频数字。"""
     cnt = Counter()
     for item in (recommends or [])[:30]:
         num = item.get("号码", "") if isinstance(item, dict) else str(item)
@@ -348,8 +348,8 @@ def format_review_section() -> str:
             span_err = safe_int(item.get("Top1跨度误差"), 99)
             form_ok = parse_bool(item.get("Top1形态一致", ""))
             score = sum_err + span_err
-            direct_hit = parse_bool(item.get("直选命中Top30", ""))
-            group_hit = parse_bool(item.get("组选命中Top30", ""))
+            direct_hit = parse_bool(item.get("直选命中Top10", ""))
+            group_hit = parse_bool(item.get("组选命中Top10", ""))
 
             strategy_results.append({
                 "name": st, "sum_err": sum_err, "span_err": span_err,
@@ -731,8 +731,8 @@ def build_review_performance(lottery_filter: str = "all") -> str:
                 continue
             recent = records[-30:]
             total = len(recent)
-            direct_hits = sum(1 for r in recent if parse_bool(r.get("直选命中Top30", "")))
-            group_hits = sum(1 for r in recent if parse_bool(r.get("组选命中Top30", "")))
+            direct_hits = sum(1 for r in recent if parse_bool(r.get("直选命中Top10", r.get("直选命中Top30", ""))))
+            group_hits = sum(1 for r in recent if parse_bool(r.get("组选命中Top10", r.get("组选命中Top30", ""))))
             morph_hits = sum(1 for r in recent if parse_bool(r.get("Top1形态一致", "")))
             sum_errors = [safe_int(r.get("Top1和值误差"), 0) for r in recent]
             span_errors = [safe_int(r.get("Top1跨度误差"), 0) for r in recent]
@@ -843,8 +843,8 @@ def build_review_message(lottery_filter: str = "all") -> str:
             if st_key == "default" and st_data:
                 default_recommends = st_data.get("推荐", [])
 
-            direct_hit = parse_bool(item.get("直选命中Top30", ""))
-            group_hit = parse_bool(item.get("组选命中Top30", ""))
+            direct_hit = parse_bool(item.get("直选命中Top10", ""))
+            group_hit = parse_bool(item.get("组选命中Top10", ""))
             hit_num = str(item.get("命中号码", "")).zfill(3) if item.get("命中号码") else ""
             hit_rank = item.get("命中排名", "")
             hit_range = item.get("命中范围", "")
@@ -919,7 +919,7 @@ def build_review_message(lottery_filter: str = "all") -> str:
                         best = r
             if best and best["top30"]:
                 parts.append("━━━━━━━━━━━━━━")
-                parts.append(f"命中策略 Top30｜{best['name']}")
+                parts.append(f"命中策略 Top10｜{best['name']}")
                 parts.append("━━━━━━━━━━━━━━")
                 parts.append(format_number_grid(best["top30"], limit=30, line_size=5))
                 parts.append("")

@@ -47,7 +47,7 @@
   <table>
     <thead><tr><th>#</th><th>号码</th><th>组选</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
     <tbody>
-    {% for r in pred.get('推荐', [])[:30] %}
+    {% for r in pred.get('推荐', [])[:10] %}
       <tr>
         <td>{{ r.get('排名','') }}</td>
         <td class="num">{{ r.get('号码','') }}</td>
