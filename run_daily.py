@@ -128,6 +128,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
     feat_file = f"data/processed/{lottery}_feat.csv"
 
     py = sys.executable
+    data_fresh = True  # 追踪数据是否为最新
 
     # 1. 数据更新
     if not run_cmd(
@@ -135,7 +136,8 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
         f"{label} 数据更新",
         timeout=180,
     ):
-        logger.warning(f"⚠️ {label} 数据更新失败，继续使用现有数据")
+        data_fresh = False
+        logger.warning(f"⚠️ {label} 数据更新失败，继续使用现有数据（预测基于旧数据）")
 
     # 2. 特征工程
     feat_cmd = [py, "scripts/feature_engine.py", "--input", raw_file,
@@ -231,6 +233,21 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
     except ImportError:
         logger.info(f"   ℹ️ {label} 可视化跳过（matplotlib未安装）")
 
+    # 写入流水线状态
+    import json
+    status_dir = BASE / 'output' / 'status'
+    status_dir.mkdir(parents=True, exist_ok=True)
+    pipeline_status = {
+        'lottery': lottery,
+        'mode': mode,
+        'data_fresh': data_fresh,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    with open(status_dir / f'{lottery}_pipeline.json', 'w', encoding='utf-8') as f:
+        json.dump(pipeline_status, f, ensure_ascii=False, indent=2)
+
+    return data_fresh
+
 
 def main():
     parser = argparse.ArgumentParser(description='彩票分析每日一键运行')
@@ -261,14 +278,17 @@ def main():
         'd3': ('福彩3D', 0),
     }
 
+    stale_lotteries = []
     for key in args.lotteries:
         if key in lotteries:
             label, skip = lotteries[key]
             logger.info(f"")
             logger.info(f"── {label} ──")
-            pipeline(key, label, skip, top_k=args.top_k,
-                     exclude_recent=args.exclude_recent,
-                     strategy=args.strategy, mode=args.mode)
+            fresh = pipeline(key, label, skip, top_k=args.top_k,
+                             exclude_recent=args.exclude_recent,
+                             strategy=args.strategy, mode=args.mode)
+            if fresh is False:
+                stale_lotteries.append(label)
 
     # 复盘摘要（review/all 模式）
     if args.mode in ('review', 'all'):
@@ -279,6 +299,8 @@ def main():
 
     logger.info(f"")
     logger.info(f"{'='*50}")
+    if stale_lotteries:
+        logger.warning(f"  ⚠️ 数据未更新: {', '.join(stale_lotteries)}（预测基于旧数据）")
     logger.info(f"  ✅ 全部任务完成！")
     if args.mode in ('predict', 'all'):
         logger.info(f"  预测文件: {BASE / 'output' / 'predictions/'}")

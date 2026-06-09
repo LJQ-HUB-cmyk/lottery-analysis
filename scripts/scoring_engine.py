@@ -624,6 +624,8 @@ def main():
         '彩种': lottery_name,
         '数据截至期号': latest_issue,
         '预测期号': target_issue,
+        'draw_issue': target_issue,  # 明确绑定开奖期号（供复盘匹配）
+        'task_id': f'{args.lottery}_{target_issue}',  # 统一任务标识
         '评分时间': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'top_k': args.top_k,
         '风险提示': risk_note,
