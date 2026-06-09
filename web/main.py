@@ -40,6 +40,7 @@ app.include_router(backtest.router, prefix="/api/backtest", tags=["回测"])
 async def index(request: Request):
     """首页：三个彩种概览"""
     from web.routes.helpers import read_json, read_review_csv
+    from scripts.push_formatter import build_predict_message, build_review_message
     import csv
 
     # 加载预测数据
@@ -68,6 +69,16 @@ async def index(request: Request):
             "morph_rate": round(morph / n * 100, 1),
         }
 
+    # 生成推送预览文本
+    try:
+        push_predict = build_predict_message()
+    except Exception:
+        push_predict = "生成失败"
+    try:
+        push_review = build_review_message()
+    except Exception:
+        push_review = "生成失败"
+
     return templates.TemplateResponse(
         request=request, name="index.html",
         context={
@@ -77,6 +88,8 @@ async def index(request: Request):
             "pls_compare": pls_compare,
             "d3_compare": d3_compare,
             "stats": stats,
+            "push_predict": push_predict,
+            "push_review": push_review,
         },
     )
 
@@ -88,6 +101,7 @@ async def lottery_page(request: Request, lottery: str):
         return templates.TemplateResponse(request=request, name="404.html", status_code=404)
 
     from web.routes.helpers import read_json, read_review_csv
+    from scripts.push_formatter import format_prediction_section, build_review_message
 
     pred = read_json(BASE / "output" / "predictions" / f"latest_{lottery}.json")
     compare = read_json(BASE / "output" / "reports" / f"{lottery}_compare_latest.json")
@@ -95,6 +109,16 @@ async def lottery_page(request: Request, lottery: str):
     history = read_review_csv()
     lt_name = "排列三" if lottery == "pls" else "福彩3D"
     lt_history = [r for r in history if r.get("彩种") == lt_name]
+
+    # 推送预览
+    try:
+        push_pred = format_prediction_section(lottery, lt_name)
+    except Exception:
+        push_pred = "生成失败"
+    try:
+        push_review = build_review_message(lottery)
+    except Exception:
+        push_review = "生成失败"
 
     return templates.TemplateResponse(
         request=request, name="lottery.html",
@@ -104,6 +128,8 @@ async def lottery_page(request: Request, lottery: str):
             "pred": pred,
             "compare": compare,
             "history": lt_history[-30:],
+            "push_pred": push_pred,
+            "push_review": push_review,
         },
     )
 

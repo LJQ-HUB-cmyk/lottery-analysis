@@ -139,4 +139,16 @@
     <p class="empty">暂无预测</p>
   {% endif %}
 </div>
+
+<!-- 推送预览 -->
+<div class="grid-2" style="margin-top:20px">
+  <div class="card">
+    <h2>📤 预测推送预览</h2>
+    <pre style="white-space:pre-wrap;font-size:12px;color:var(--text2);line-height:1.6;max-height:500px;overflow-y:auto;background:var(--bg);padding:15px;border-radius:8px">{{ push_predict }}</pre>
+  </div>
+  <div class="card">
+    <h2>📤 复盘推送预览</h2>
+    <pre style="white-space:pre-wrap;font-size:12px;color:var(--text2);line-height:1.6;max-height:500px;overflow-y:auto;background:var(--bg);padding:15px;border-radius:8px">{{ push_review }}</pre>
+  </div>
+</div>
 {% endblock %}
