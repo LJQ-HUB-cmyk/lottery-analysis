@@ -2,7 +2,7 @@
   "彩种": "福彩3D",
   "数据截至期号": 2026144,
   "预测期号": 2026145,
-  "评分时间": "2026-06-04 20:25:42",
+  "评分时间": "2026-06-04 21:09:41",
   "top_k": 30,
   "风险提示": "⚠️ 彩票开奖具有高度随机性，本评分仅基于历史统计和理论分布，不代表未来开奖结果。请理性看待，量力而行。",
   "摘要": {
@@ -82,10 +82,10 @@
   },
   "生成信息": {
     "命令": "python scripts/scoring_engine.py --lottery d3 --top-k 30 --exclude-recent 5 --exclude-mode direct",
-    "权重文件": "rules\\scoring_weights.yaml",
-    "统计缓存": "data\\cache\\d3_stats_latest.json",
-    "数据文件": "data\\processed\\d3_feat.csv",
-    "代码版本": "3126c87"
+    "权重文件": "rules/scoring_weights.yaml",
+    "统计缓存": "data/cache/d3_stats_latest.json",
+    "数据文件": "data/processed/d3_feat.csv",
+    "代码版本": "8c7a399"
   },
   "权重": {
     "和值": 18,
