@@ -184,7 +184,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
             'enhanced':     {'weights': None,                    'name': 'enhanced'},
         }
 
-        all_strategies = ['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced']
+        all_strategies = ['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced', 'coverage']
         strategies = [strategy] if strategy != 'all' else all_strategies
 
         for st in strategies:
@@ -195,6 +195,15 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
                                "--top-k", str(top_k), "--exclude-recent", str(exclude_recent)]
                 desc = f"{label} 增强预测 [enhanced] (top-k={top_k})"
                 if not run_cmd(enhanced_cmd, desc, timeout=120):
+                    if strategy != 'all':
+                        return data_fresh
+                continue
+            # coverage 策略使用覆盖率优化器
+            if st == 'coverage':
+                coverage_cmd = [py, "scripts/coverage_optimizer.py", "--lottery", lottery,
+                                "--strategy", "balanced", "--top-k", str(top_k)]
+                desc = f"{label} 覆盖率优化 [coverage] (top-k={top_k})"
+                if not run_cmd(coverage_cmd, desc, timeout=120):
                     if strategy != 'all':
                         return data_fresh
                 continue
@@ -260,7 +269,7 @@ def main():
                         help='推荐注数（默认10）')
     parser.add_argument('--exclude-recent', type=int, default=5,
                         help='排除近N期已出号码（默认5）')
-    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced', 'all'],
+    parser.add_argument('--strategy', choices=['default', 'conservative', 'diversity', 'auto_tuned', 'enhanced', 'coverage', 'all'],
                         default='default',
                         help='评分策略：default/conservative/diversity/auto_tuned/enhanced/all（默认default）')
     args = parser.parse_args()

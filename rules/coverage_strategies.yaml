@@ -1,0 +1,68 @@
+# 覆盖率优化策略配置
+# ==================
+# 通过均衡覆盖和值区间、形态、胆码等维度，提升同样 10 注的命中概率。
+# 彩票是随机事件，无法提升单注命中率，但可以提升覆盖率。
+
+# ── 策略选择 ──
+# 可选值：balanced / wheeling / danma_expand / sum_spread / morph_spread
+# 也可组合：["balanced", "danma_expand"]
+active_strategy: balanced
+
+# ── 全局参数 ──
+global:
+  top_k: 10                    # 最终输出注数
+  exclude_recent: 5            # 排除近 N 期已出号码
+  include_baozi: false         # 是否包含豹子
+
+# ── 策略 A：均衡覆盖（balanced）──
+# 从原评分引擎 Top-N 中，按和值区间+形态+跨度均衡选取
+balanced:
+  # 和值区间覆盖：强制覆盖低/中/高三个区间
+  sum_zones:
+    low:  { range: [0, 9],  min_count: 2 }    # 低区至少 2 注
+    mid:  { range: [10, 17], min_count: 4 }    # 中区至少 4 注
+    high: { range: [18, 27], min_count: 2 }    # 高区至少 2 注
+
+  # 形态覆盖：强制包含组三
+  morphology:
+    组六_min: 6                # 组六至少 6 注
+    组三_min: 2                # 组三至少 2 注
+    豹子_max: 0                # 豹子最多 0 注
+
+  # 跨度覆盖：避免跨度过于集中
+  span_spread:
+    enabled: true
+    min_span_range: 3          # 最大跨度 - 最小跨度 ≥ 3
+
+# ── 策略 B：旋转覆盖（wheeling）──
+# 选 N 个高分数字，用旋转矩阵生成组合，保证 K/N 覆盖
+wheeling:
+  pool_size: 7                 # 从 Top-N 选 7 个数字作为胆码池
+  guarantee: 3                 # 保证：如果开奖有 3 个在池中，一定能命中组选
+  output_count: 10             # 输出注数
+
+# ── 策略 C：胆码扩展（danma_expand）──
+# 从 Top10 提取高频数字作为胆码，展开所有包含这些胆码的组合
+danma_expand:
+  danma_count: 5               # 胆码数量（3→5 提升命中率）
+  source_range: 10             # 从 Top-N 中提取胆码
+  # 展开规则：每个组合至少包含 2 个胆码
+  min_danma_per_bet: 2
+
+# ── 策略 D：和值区间分散（sum_spread）──
+# 在每个和值区间内选最高分号码
+sum_spread:
+  zones:
+    - { range: [6, 9],   count: 1 }    # 低区 1 注
+    - { range: [10, 12],  count: 2 }    # 中低区 2 注
+    - { range: [13, 15],  count: 3 }    # 中区 3 注（最常见）
+    - { range: [16, 18],  count: 2 }    # 中高区 2 注
+    - { range: [19, 22],  count: 1 }    # 高区 1 注
+    - { range: [23, 27],  count: 1 }    # 极高区 1 注
+
+# ── 策略 E：形态分散（morph_spread）──
+# 强制按形态比例选取
+morph_spread:
+  组六_count: 7                # 组六 7 注
+  组三_count: 3                # 组三 3 注
+  豹子_count: 0                # 豹子 0 注
