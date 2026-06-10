@@ -19,9 +19,13 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
+
 BASE = Path(__file__).resolve().parent.parent
 HISTORY_PATH = BASE / 'output' / 'reviews' / 'review_history.csv'
 METRICS_DIR = BASE / 'output' / 'metrics'
+PRED_DIR = BASE / 'output' / 'predictions'
+FEAT_DIR = BASE / 'data' / 'processed'
 
 
 def read_history():
@@ -62,6 +66,68 @@ def get_hit(row, field):
     if hit_range in ('Top5', 'Top10', 'Top30'):
         return True
     return False
+
+
+def recompute_group_hits(rows, lottery='pls'):
+    """从预测文件重新计算组选命中率。
+
+    旧 CSV 数据的 直选命中Top10/组选命中Top10 字段不区分直选/组选。
+    此函数从预测 JSON + 开奖数据重新计算真实的组选命中。
+    """
+    feat_path = FEAT_DIR / f'{lottery}_feat.csv'
+    if not feat_path.exists():
+        return rows
+
+    feat_df = pd.read_csv(feat_path, encoding='utf-8-sig')
+    feat_df = feat_df.sort_values('期数', ascending=False).reset_index(drop=True)
+
+    updated = []
+    for r in rows:
+        issue = str(r.get('期号', '')).strip()
+        strategy = r.get('策略', 'default')
+
+        # 找开奖号码
+        draw_row = feat_df[feat_df['期数'].astype(str) == issue]
+        if draw_row.empty:
+            updated.append(r)
+            continue
+
+        draw_num = f"{int(draw_row.iloc[0]['红球1'])}{int(draw_row.iloc[0]['红球2'])}{int(draw_row.iloc[0]['红球3'])}"
+        draw_group = ''.join(sorted(draw_num))
+
+        # 找预测文件
+        prefix = f'{lottery}_{strategy}' if strategy != 'default' else lottery
+        pred_path = PRED_DIR / f'{prefix}_predict_{issue}.json'
+        if not pred_path.exists():
+            pred_path = PRED_DIR / f'latest_{prefix}.json'
+
+        if not pred_path.exists():
+            updated.append(r)
+            continue
+
+        try:
+            pred_data = json.loads(pred_path.read_text(encoding='utf-8'))
+        except Exception:
+            updated.append(r)
+            continue
+
+        # 检查 Top10 中是否有组选命中
+        recommends = pred_data.get('推荐', [])[:10]
+        direct_hit = any(
+            str(rec.get('号码', '')).zfill(3) == draw_num
+            for rec in recommends
+        )
+        group_hit = any(
+            ''.join(sorted(str(rec.get('号码', '')).zfill(3))) == draw_group
+            for rec in recommends
+        )
+
+        r = dict(r)
+        r['直选命中Top10'] = str(direct_hit)
+        r['组选命中Top10'] = str(group_hit)
+        updated.append(r)
+
+    return updated
 
 
 def compute_metrics(rows, windows=None):
@@ -209,6 +275,9 @@ def main():
             continue
 
         lt_key = 'pls' if lt_name == '排列三' else 'd3'
+
+        # 从预测文件重新计算组选命中率（修复旧 CSV 数据不区分直选/组选的问题）
+        lt_rows = recompute_group_hits(lt_rows, lt_key)
 
         # 计算多窗口指标
         metrics = compute_metrics(lt_rows, windows)

@@ -8,24 +8,24 @@
 {% set m30_d3 = d3_metrics.get('30', {}) if d3_metrics else {} %}
 <div class="stat-cards">
   <div class="stat-card">
+    <div class="label">排列三 组选命中率</div>
+    <div class="value {% if m30_pls.get('组选命中率', 0) >= 10 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('组选命中率', '-') }}%</div>
+    <div class="label">近{{ m30_pls.get('期数', '?') }}期</div>
+  </div>
+  <div class="stat-card">
     <div class="label">排列三 和值命中率</div>
     <div class="value {% if m30_pls.get('和值命中率', 0) >= 20 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('和值命中率', '-') }}%</div>
     <div class="label">Top1和值差≤2，近{{ m30_pls.get('期数', '?') }}期</div>
   </div>
   <div class="stat-card">
-    <div class="label">排列三 形态命中率</div>
-    <div class="value {% if m30_pls.get('形态命中率', 0) >= 60 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('形态命中率', '-') }}%</div>
-    <div class="label">近{{ m30_pls.get('期数', '?') }}期</div>
+    <div class="label">福彩3D 组选命中率</div>
+    <div class="value {% if m30_d3.get('组选命中率', 0) >= 10 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('组选命中率', '-') }}%</div>
+    <div class="label">近{{ m30_d3.get('期数', '?') }}期</div>
   </div>
   <div class="stat-card">
     <div class="label">福彩3D 和值命中率</div>
     <div class="value {% if m30_d3.get('和值命中率', 0) >= 20 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('和值命中率', '-') }}%</div>
     <div class="label">Top1和值差≤2，近{{ m30_d3.get('期数', '?') }}期</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">福彩3D 形态命中率</div>
-    <div class="value {% if m30_d3.get('形态命中率', 0) >= 60 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('形态命中率', '-') }}%</div>
-    <div class="label">近{{ m30_d3.get('期数', '?') }}期</div>
   </div>
 </div>
 
