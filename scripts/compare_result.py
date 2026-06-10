@@ -41,8 +41,7 @@ def load_prediction(lottery, prediction_path=None, strategy='default', issue=Non
             path = pred_dir / f'latest_{prefix}.json'
 
     if not path.exists():
-        print(f"[错误] 预测文件不存在: {path}")
-        sys.exit(2)
+        raise FileNotFoundError(f"预测文件不存在: {path}")
 
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -52,9 +51,7 @@ def load_latest_draw(lottery):
     """从特征 CSV 读取最新一期开奖"""
     path = BASE_DIR / 'data' / 'processed' / f'{lottery}_feat.csv'
     if not path.exists():
-        print(f"[错误] 特征数据不存在: {path}")
-        print(f"  请先运行: python run_daily.py {lottery}")
-        sys.exit(2)
+        raise FileNotFoundError(f"特征数据不存在: {path}，请先运行: python run_daily.py {lottery}")
 
     df = pd.read_csv(path, encoding='utf-8-sig')
     latest = df.iloc[0]
@@ -366,8 +363,17 @@ def main():
                         help='策略名称（默认default，用于加载对应预测文件）')
     args = parser.parse_args()
 
-    actual = load_latest_draw(args.lottery)
-    pred_json = load_prediction(args.lottery, args.prediction, args.strategy, issue=str(actual['期号']))
+    try:
+        actual = load_latest_draw(args.lottery)
+    except FileNotFoundError as e:
+        print(f"[错误] {e}")
+        sys.exit(2)
+
+    try:
+        pred_json = load_prediction(args.lottery, args.prediction, args.strategy, issue=str(actual['期号']))
+    except FileNotFoundError as e:
+        print(f"[错误] {e}")
+        sys.exit(2)
     rows = compare(pred_json.get('推荐', []), actual)
     report = build_report(pred_json, actual, rows)
 

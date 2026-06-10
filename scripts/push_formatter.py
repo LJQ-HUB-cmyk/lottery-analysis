@@ -103,6 +103,19 @@ def parse_bool(val: str) -> bool:
     return str(val).strip().lower() in {"true", "1", "yes", "y", "是", "命中", "✅"}
 
 
+def _get_hit(row: dict, field: str) -> bool:
+    """读取命中字段，兼容 Top10 和 Top30，处理 NaN/空值。"""
+    for f in [f"{field}Top10", f"{field}Top30"]:
+        val = row.get(f)
+        if val is not None and str(val).strip().lower() not in ("nan", "none", "", "-"):
+            return parse_bool(val)
+    # 回退：从 命中范围 推断
+    hit_range = str(row.get("命中范围", "")).strip()
+    if hit_range in ("Top5", "Top10", "Top30"):
+        return True
+    return False
+
+
 def hot_numbers(win: dict) -> list[str]:
     """从窗口统计提取热号（近10期出现最多的数字）"""
     freq = win.get("全位数字频率", {})
@@ -348,8 +361,8 @@ def format_review_section() -> str:
             span_err = safe_int(item.get("Top1跨度误差"), 99)
             form_ok = parse_bool(item.get("Top1形态一致", ""))
             score = sum_err + span_err
-            direct_hit = parse_bool(item.get("直选命中Top10", ""))
-            group_hit = parse_bool(item.get("组选命中Top10", ""))
+            direct_hit = _get_hit(item, "直选命中")
+            group_hit = _get_hit(item, "组选命中")
 
             strategy_results.append({
                 "name": st, "sum_err": sum_err, "span_err": span_err,
@@ -731,8 +744,8 @@ def build_review_performance(lottery_filter: str = "all") -> str:
                 continue
             recent = records[-30:]
             total = len(recent)
-            direct_hits = sum(1 for r in recent if parse_bool(r.get("直选命中Top10", r.get("直选命中Top30", ""))))
-            group_hits = sum(1 for r in recent if parse_bool(r.get("组选命中Top10", r.get("组选命中Top30", ""))))
+            direct_hits = sum(1 for r in recent if _get_hit(r, "直选命中"))
+            group_hits = sum(1 for r in recent if _get_hit(r, "组选命中"))
             morph_hits = sum(1 for r in recent if parse_bool(r.get("Top1形态一致", "")))
             sum_errors = [safe_int(r.get("Top1和值误差"), 0) for r in recent]
             span_errors = [safe_int(r.get("Top1跨度误差"), 0) for r in recent]
@@ -843,8 +856,8 @@ def build_review_message(lottery_filter: str = "all") -> str:
             if st_key == "default" and st_data:
                 default_recommends = st_data.get("推荐", [])
 
-            direct_hit = parse_bool(item.get("直选命中Top10", ""))
-            group_hit = parse_bool(item.get("组选命中Top10", ""))
+            direct_hit = _get_hit(item, "直选命中")
+            group_hit = _get_hit(item, "组选命中")
             hit_num = str(item.get("命中号码", "")).zfill(3) if item.get("命中号码") else ""
             hit_rank = item.get("命中排名", "")
             hit_range = item.get("命中范围", "")

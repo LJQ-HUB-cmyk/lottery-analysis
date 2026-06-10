@@ -7,7 +7,7 @@
   数据更新 → 特征工程 → 统计引擎 → 复盘对比 → 评分预测 → 可视化
 
 用法：
-    python run_daily.py                     # 跑两个彩种（默认Top-30，仅预测）
+    python run_daily.py                     # 跑两个彩种（默认Top-10，仅预测）
     python run_daily.py --mode review       # 仅复盘
     python run_daily.py --mode all          # 复盘 + 预测（开奖后一条命令搞定）
     python run_daily.py pls --mode all      # 仅排列三，复盘+预测
@@ -16,6 +16,7 @@
 """
 
 import argparse
+import json
 import logging
 import os
 import subprocess
@@ -145,7 +146,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
     if lottery == 'pls':
         feat_cmd.extend(["--skiprows", str(skiprows)])
     if not run_cmd(feat_cmd, f"{label} 特征工程", timeout=300):
-        return
+        return False
 
     # 3. 统计引擎
     if not run_cmd(
@@ -153,7 +154,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
         f"{label} 统计引擎",
         timeout=120,
     ):
-        return
+        return False
 
     # ── 复盘步骤（review/all 模式）──
     if mode in ('review', 'all'):
@@ -195,7 +196,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
                 desc = f"{label} 增强预测 [enhanced] (top-k={top_k})"
                 if not run_cmd(enhanced_cmd, desc, timeout=120):
                     if strategy != 'all':
-                        return
+                        return data_fresh
                 continue
             wpath = Path(cfg['weights']) if cfg['weights'] else None
             if wpath and not wpath.exists():
@@ -210,7 +211,7 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
             desc = f"{label} 评分预测 [{st}] (top-k={top_k})"
             if not run_cmd(score_cmd, desc, timeout=120):
                 if strategy != 'all':
-                    return
+                    return data_fresh
 
         # 5. 策略融合（共识投票加权，生成 ensemble 预测）
         if strategy == 'all':
@@ -234,7 +235,6 @@ def pipeline(lottery, label, skiprows=0, top_k=30, exclude_recent=5,
         logger.info(f"   ℹ️ {label} 可视化跳过（matplotlib未安装）")
 
     # 写入流水线状态
-    import json
     status_dir = BASE / 'output' / 'status'
     status_dir.mkdir(parents=True, exist_ok=True)
     pipeline_status = {

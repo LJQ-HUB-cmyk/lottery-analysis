@@ -6,7 +6,7 @@
 1. 分位数字分析：百位/十位/个位各取 Top3-4 组合（27-64 注覆盖密度 37-64 倍）
 2. 和值区间过滤：预测最可能和值区间 ±2，候选池优先排列
 3. 对子/连号模式：近期对子/连号频率加分
-4. 热号池策略：Top30 高频数字展开组合作为互补池
+4. 热号池策略：Top10 高频数字展开组合作为互补池
 5. 多期窗口动态权重：近 5/10 期表现好的维度自动加权
 
 用法：
@@ -359,14 +359,14 @@ def predict_enhanced(lottery: str, top_k: int = 30,
     # 5. 动态权重
     dim_weights = compute_dimension_weights(feat_df, base_weights)
 
-    # 合并候选池（分位候选 + 热号池候选 + 原 Top30）
+    # 合并候选池（分位候选 + 热号池候选 + 原 Top10）
     all_candidates = set()
     for n in pos_candidates:
         all_candidates.add(tuple(sorted(n)))
     for n in pool_candidates:
         all_candidates.add(tuple(sorted(n)))
 
-    # 加入原 Top30 的候选
+    # 加入原 Top10 的候选
     for num_str, _ in sorted(base_scores.items(), key=lambda x: -x[1])[:50]:
         digits = tuple(int(d) for d in num_str.zfill(3))
         all_candidates.add(tuple(sorted(digits)))

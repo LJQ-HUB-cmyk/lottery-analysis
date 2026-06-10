@@ -42,7 +42,6 @@ async def index(request: Request):
     """首页：三个彩种概览"""
     from web.routes.helpers import read_json, read_review_csv
     from scripts.push_formatter import build_predict_message, build_review_message
-    import csv
 
     # 加载预测数据
     pls_pred = read_json(BASE / "output" / "predictions" / "latest_pls.json")
@@ -65,8 +64,8 @@ async def index(request: Request):
         rows = [r for r in history if r.get("彩种") == lt_name and r.get("策略") == "default"]
         recent = rows[-30:]
         n = len(recent) or 1
-        direct = sum(1 for r in recent if str(r.get("直选命中Top10", r.get("直选命中Top30", ""))).lower() in ("true", "1"))
-        group = sum(1 for r in recent if str(r.get("组选命中Top10", r.get("组选命中Top30", ""))).lower() in ("true", "1"))
+        direct = sum(1 for r in recent if str(r.get("直选命中Top10", r.get("直选命中Top30", ""))).lower() in ("true", "1") or str(r.get("命中范围", "")).strip() in ("Top5", "Top10", "Top30"))
+        group = sum(1 for r in recent if str(r.get("组选命中Top10", r.get("组选命中Top30", ""))).lower() in ("true", "1") or str(r.get("命中范围", "")).strip() in ("Top5", "Top10", "Top30"))
         morph = sum(1 for r in recent if r.get("Top1形态一致", "").lower() in ("true", "1"))
         stats[lt_key] = {
             "n": len(recent),

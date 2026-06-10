@@ -133,15 +133,23 @@ def check_integrity() -> list[str]:
         print(f"  📋 0 期有效数据")
         return warnings
 
-    # 缺期检测
+    # 缺期检测（按年份分组，避免跨年误报）
     if len(sorted_issues) >= 2:
         try:
-            first = int(sorted_issues[0])
-            last = int(sorted_issues[-1])
-            expected = first - last + 1
-            if len(sorted_issues) < expected:
-                warnings.append(f"⚠️ 缺期：应有{expected}期，实际{len(sorted_issues)}期")
-        except ValueError:
+            # 按年份分组检测
+            from collections import defaultdict
+            by_year = defaultdict(list)
+            for issue in sorted_issues:
+                year = issue[:4]
+                by_year[year].append(int(issue))
+            for year, issues_in_year in sorted(by_year.items()):
+                if len(issues_in_year) >= 2:
+                    first_y = max(issues_in_year)
+                    last_y = min(issues_in_year)
+                    expected_y = first_y - last_y + 1
+                    if len(issues_in_year) < expected_y:
+                        warnings.append(f"⚠️ {year}年缺期：应有{expected_y}期，实际{len(issues_in_year)}期")
+        except (ValueError, IndexError):
             pass
     return warnings
 
