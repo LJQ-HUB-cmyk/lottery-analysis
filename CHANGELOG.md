@@ -2,6 +2,45 @@
 
 > 集中式变更日志，按版本从新到旧排列。单日详细记录见 `docs/` 目录。
 
+## v2.18.5 (2026-06-10)
+
+- **代码审查修复**：`run_daily.py` pipeline bare return → `return False`/`return data_fresh`；`import json` 移至顶部；文档注释 Top-30→Top-10
+- **web/main.py**：删除未使用 `import csv`
+- **push_formatter.py**：新增 `_get_hit()` 辅助函数，统一命中字段读取（兼容 Top10/Top30/命中范围）
+- **kl8/fetcher.py**：缺期检测按年份分组，避免跨年误报
+- **compare_result.py**：`sys.exit(2)` → `raise FileNotFoundError`，main() 中 try/except 捕获
+- **enhanced_predictor.py**：注释 Top30→Top10
+
+## v2.18.4 (2026-06-10)
+
+- **命中率统计体系**：新增 `scripts/metrics.py`，多维度（直选/组选/形态/和值/跨度/胆码）+ 多窗口（7/30/90/180期）+ 趋势数据
+- **Web 仪表板命中率仪表盘**：首页 4 个核心指标卡片 + 多维度命中率展示 + ECharts 趋势图
+- **compare_result.py 增加新字段**：胆码命中、和值命中、跨度命中、形态命中
+- **metrics API**：`GET /api/metrics/pls`、`GET /api/metrics/d3`、`/api/metrics/pls/trend`
+- **集成**：`run_daily.py --mode all` 自动生成 metrics JSON
+
+## v2.18.3 (2026-06-09)
+
+- **Top30→Top10 统一**：默认 top-k 从 30 改为 10（run_daily/scoring_engine/backtest/enhanced_predictor）
+- **CSV 字段名迁移**：`直选命中Top30`→`直选命中Top10`（兼容旧数据读取）
+- **JSON 字段名迁移**：`Top30号码`→`Top10号码`
+- **推送文案**：Top30→Top10
+- **Web 模板**：表格显示 10 行
+
+## v2.18.2 (2026-06-09)
+
+- **Web 仪表板增加推送预览框**：首页 + 排列三/福彩3D 详情页底部显示飞书推送格式预览
+- **Web 模板标题修复**：Top30→Top10
+- **web/main.py 语法修复**：`.lower()` 括号位置修正
+
+## v2.18.1 (2026-06-09)
+
+- **FastAPI Web 仪表板**：`web/` 模块 + `run_web.py` 启动器，5 个页面（首页/排列三/福彩3D/快乐8/回测中心）+ ECharts 交互图表
+- **静态 HTML 仪表板降为备用**：`build_dashboard.py` 保留但不再自动生成
+- **回测系统升级 v3**：自动发现并对比所有策略权重（default/conservative/diversity/auto_tuned）
+- **回测页面修复**：读取带时间戳的回测文件
+- **新增 `rules/prizes.yaml`**：奖金配置外部化
+
 ## v2.18.0 (2026-06-05)
 
 - **新增增强预测器 v1**：`scripts/enhanced_predictor.py`，5 大改进提升命中率——分位数字分析（百/十/个位各取 Top3 组合 27 注）、和值区间过滤（±2 优先）、对子/连号模式加分、热号池展开组合、多期窗口动态权重。集成到 `run_daily.py --strategy enhanced`

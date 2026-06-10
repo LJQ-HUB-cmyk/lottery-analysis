@@ -40,6 +40,10 @@ data/kl8/*
 !output/backtests/
 !output/backtests/*.json
 
+# 命中率统计（运行时生成）
+!output/metrics/
+!output/metrics/*.json
+
 # 测试记录
 !output/tests/
 !output/tests/*.md
@@ -47,7 +51,9 @@ data/kl8/*
 # 推送运行时数据
 output/push/*.jsonl
 output/push/pending_*.md
-!output/push/push_state.json
+output/push/*.md
+output/push/reviews/
+!output/push/.gitkeep
 
 # 任务状态（运行时产物，不提交）
 output/status/*

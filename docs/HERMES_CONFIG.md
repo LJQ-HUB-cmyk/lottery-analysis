@@ -1,7 +1,8 @@
 # Hermes 定时任务配置
 
-> 此文件供 Hermes 读取并自动配置定时任务。修改此文件后，同步至 Hermes 平台生效。
-> 最后更新：2026-06-05（v2.18.0：性能优化 + hermes_push 拆分 + KL8 完善 + 测试）
+> ⚠️ **Hermes 已停用**，改为本地手动运行。此文件保留为参考。
+> 本地使用方式：`python run_daily.py --mode all --strategy all` + `python run_web.py`
+> 最后更新：2026-06-10（v2.18.5）
 
 ---
 

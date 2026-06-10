@@ -60,6 +60,7 @@ lottery-analysis/
 │   ├── backtest.py           # Walk-forward 回测（多策略对比 + ROI拆分）
 │   ├── compare_result.py     # 预测 vs 开奖对比 + review_history累加
 │   ├── review_summary.py     # 最近N期复盘表现摘要
+│   ├── metrics.py            # 命中率统计（多维度+多窗口+趋势数据）
 │   ├── daily_review.py       # 每日复盘一键脚本（Hermes cron调用）
 │   ├── tune_scoring_params.py # 权重自动调优（Optuna 贝叶斯优化）
 │   ├── build_ensemble_predictions.py # 策略融合（共识投票加权预测）
@@ -111,9 +112,9 @@ lottery-analysis/
 │   ├── kl8/         # 快乐8历史数据 + latest JSON
 │   └── quarantine/  # 坏数据隔离区（git忽略）
 ├── web/                  # Web 仪表板（FastAPI + Jinja2 + ECharts）
-│   ├── main.py           # FastAPI 入口
-│   ├── routes/           # API 路由（pls/d3/kl8/backtest）
-│   ├── templates/        # Jinja2 HTML 模板
+│   ├── main.py           # FastAPI 入口 + 页面路由
+│   ├── routes/           # API 路由（pls/d3/kl8/backtest/metrics）
+│   ├── templates/        # Jinja2 HTML 模板（深色主题）
 │   └── static/           # 静态资源
 ├── tests/                # 单元测试（pytest）
 └── output/
@@ -133,10 +134,11 @@ lottery-analysis/
 ### 每日一键运行
 
 ```bash
-python run_daily.py                              # 跑两个彩种，默认策略Top-30
-python run_daily.py pls --top-k 10               # 只跑排列三，10注
-python run_daily.py --strategy conservative       # 稳健策略
-python run_daily.py --strategy all                # 三套策略全跑
+python run_daily.py --mode all --strategy all     # 复盘+预测（开奖后一条命令）
+python run_daily.py pls --mode all --top-k 10     # 只跑排列三，10注
+python run_daily.py --mode review                  # 仅复盘
+python run_daily.py --strategy conservative        # 稳健策略
+python run_daily.py --strategy all                 # 六套策略全跑
 ```
 
 ### 每日复盘
