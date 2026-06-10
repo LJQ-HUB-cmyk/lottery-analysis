@@ -62,6 +62,12 @@
   </table>
 </div>
 
+<!-- 胆码分析 -->
+<div class="card" style="margin-bottom:20px">
+  <h2>🎲 胆码分析（Top10 高频数字）</h2>
+  <div id="danma-chart" class="chart-sm"></div>
+</div>
+
 <!-- 历史命中图表 -->
 <div class="card">
   <h2>📈 近期误差趋势</h2>
@@ -88,6 +94,36 @@
     ]
   });
   window.addEventListener('resize', function() { chart.resize(); });
+
+  // 胆码分析图
+  var danmaEl = document.getElementById('danma-chart');
+  if (danmaEl) {
+    // 统计 Top10 预测中每个数字出现频率
+    var predData = {{ pred | tojson }};
+    var recommends = (predData && predData['推荐']) ? predData['推荐'] : [];
+    var digitCount = {};
+    for (var d = 0; d <= 9; d++) digitCount[d] = 0;
+    recommends.slice(0, 10).forEach(function(r) {
+      var num = String(r['号码'] || '').padStart(3, '0');
+      for (var i = 0; i < num.length; i++) {
+        var digit = parseInt(num[i]);
+        if (!isNaN(digit)) digitCount[digit]++;
+      }
+    });
+    var digits = Object.keys(digitCount).sort();
+    var counts = digits.map(function(d) { return digitCount[d]; });
+    var colors = counts.map(function(c) { return c >= 6 ? '#ef4444' : (c >= 4 ? '#fbbf24' : '#64748b'); });
+
+    var danmaChart = echarts.init(danmaEl);
+    danmaChart.setOption({
+      tooltip: {},
+      grid: { left: 30, right: 10, bottom: 25, top: 10 },
+      xAxis: { type: 'category', data: digits, axisLabel: { color: '#64748b' } },
+      yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: '#1e293b' } }, max: 10 },
+      series: [{ type: 'bar', data: counts.map(function(c, i) { return {value: c, itemStyle: {color: colors[i]}}; } }]
+    });
+    window.addEventListener('resize', function() { danmaChart.resize(); });
+  }
 })();
 </script>
 

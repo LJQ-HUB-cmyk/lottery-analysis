@@ -3,64 +3,51 @@
 {% block title %}彩票分析仪表板{% endblock %}
 
 {% block content %}
-<!-- 命中率仪表盘 -->
+<!-- 核心指标卡片 -->
 {% set m30_pls = pls_metrics.get('30', {}) if pls_metrics else {} %}
 {% set m30_d3 = d3_metrics.get('30', {}) if d3_metrics else {} %}
 <div class="stat-cards">
   <div class="stat-card">
-    <div class="label">排列三 直选命中率</div>
-    <div class="value {% if m30_pls.get('直选命中率', 0) > 5 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('直选命中率', stats.pls.direct_rate) }}%</div>
-    <div class="label">近{{ m30_pls.get('期数', stats.pls.n) }}期</div>
+    <div class="label">排列三 和值命中率</div>
+    <div class="value {% if m30_pls.get('和值命中率', 0) >= 20 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('和值命中率', '-') }}%</div>
+    <div class="label">Top1和值差≤2，近{{ m30_pls.get('期数', '?') }}期</div>
   </div>
   <div class="stat-card">
-    <div class="label">排列三 组选命中率</div>
-    <div class="value {% if m30_pls.get('组选命中率', 0) > 20 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('组选命中率', stats.pls.group_rate) }}%</div>
-    <div class="label">近{{ m30_pls.get('期数', stats.pls.n) }}期</div>
+    <div class="label">排列三 形态命中率</div>
+    <div class="value {% if m30_pls.get('形态命中率', 0) >= 60 %}green{% else %}yellow{% endif %}">{{ m30_pls.get('形态命中率', '-') }}%</div>
+    <div class="label">近{{ m30_pls.get('期数', '?') }}期</div>
   </div>
   <div class="stat-card">
-    <div class="label">福彩3D 直选命中率</div>
-    <div class="value {% if m30_d3.get('直选命中率', 0) > 5 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('直选命中率', stats.d3.direct_rate) }}%</div>
-    <div class="label">近{{ m30_d3.get('期数', stats.d3.n) }}期</div>
+    <div class="label">福彩3D 和值命中率</div>
+    <div class="value {% if m30_d3.get('和值命中率', 0) >= 20 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('和值命中率', '-') }}%</div>
+    <div class="label">Top1和值差≤2，近{{ m30_d3.get('期数', '?') }}期</div>
   </div>
   <div class="stat-card">
-    <div class="label">福彩3D 组选命中率</div>
-    <div class="value {% if m30_d3.get('组选命中率', 0) > 20 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('组选命中率', stats.d3.group_rate) }}%</div>
-    <div class="label">近{{ m30_d3.get('期数', stats.d3.n) }}期</div>
+    <div class="label">福彩3D 形态命中率</div>
+    <div class="value {% if m30_d3.get('形态命中率', 0) >= 60 %}green{% else %}yellow{% endif %}">{{ m30_d3.get('形态命中率', '-') }}%</div>
+    <div class="label">近{{ m30_d3.get('期数', '?') }}期</div>
   </div>
 </div>
 
-<!-- 多维度命中率 -->
-{% if m30_pls or m30_d3 %}
-<div class="grid-2" style="margin-bottom:20px">
-  <div class="card">
-    <h2>📈 排列三 近30期命中率</h2>
-    <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="metric"><span class="label">形态</span><span class="value">{{ m30_pls.get('形态命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">和值</span><span class="value">{{ m30_pls.get('和值命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">跨度</span><span class="value">{{ m30_pls.get('跨度命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">胆码双中</span><span class="value">{{ m30_pls.get('胆码双中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">均和差</span><span class="value">{{ m30_pls.get('平均和值差', '-') }}</span></div>
-      <div class="metric"><span class="label">均跨差</span><span class="value">{{ m30_pls.get('平均跨度差', '-') }}</span></div>
-    </div>
-  </div>
-  <div class="card">
-    <h2>📈 福彩3D 近30期命中率</h2>
-    <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="metric"><span class="label">形态</span><span class="value">{{ m30_d3.get('形态命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">和值</span><span class="value">{{ m30_d3.get('和值命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">跨度</span><span class="value">{{ m30_d3.get('跨度命中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">胆码双中</span><span class="value">{{ m30_d3.get('胆码双中率', '-') }}%</span></div>
-      <div class="metric"><span class="label">均和差</span><span class="value">{{ m30_d3.get('平均和值差', '-') }}</span></div>
-      <div class="metric"><span class="label">均跨差</span><span class="value">{{ m30_d3.get('平均跨度差', '-') }}</span></div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-<!-- 命中率趋势图 -->
+<!-- 多维度命中率 + 时间窗口切换 -->
 <div class="card" style="margin-bottom:20px">
-  <h2>📊 命中率趋势（近30期滚动）</h2>
-  <div id="trend-chart" class="chart"></div>
+  <h2>📈 多维度命中率</h2>
+  <div style="display:flex;gap:8px;margin-bottom:15px">
+    <button class="window-btn active" onclick="switchWindow('7')">近7期</button>
+    <button class="window-btn" onclick="switchWindow('30')">近30期</button>
+    <button class="window-btn" onclick="switchWindow('90')">近90期</button>
+    <button class="window-btn" onclick="switchWindow('180')">近180期</button>
+  </div>
+  <div class="grid-2" id="metrics-grid">
+    <div class="card" id="pls-metrics">
+      <h3>排列三</h3>
+      <div id="pls-metrics-content"></div>
+    </div>
+    <div class="card" id="d3-metrics">
+      <h3>福彩3D</h3>
+      <div id="d3-metrics-content"></div>
+    </div>
+  </div>
 </div>
 
 <!-- 最新复盘 -->
@@ -112,14 +99,14 @@
   </div>
 </div>
 
-<!-- 预测 Top5 -->
-<div class="grid-2">
+<!-- Top10 预测 -->
+<div class="grid-2" style="margin-bottom:20px">
   <div class="card">
-    <h2>🎯 排列三 Top5 预测</h2>
+    <h2>🎯 排列三 Top10 预测</h2>
     <table>
       <thead><tr><th>#</th><th>号码</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
       <tbody>
-      {% for r in pls_pred.get('推荐', [])[:5] %}
+      {% for r in pls_pred.get('推荐', [])[:10] %}
         <tr>
           <td>{{ r.get('排名','') }}</td>
           <td class="num">{{ r.get('号码','') }}</td>
@@ -135,11 +122,11 @@
   </div>
 
   <div class="card">
-    <h2>🎯 福彩3D Top5 预测</h2>
+    <h2>🎯 福彩3D Top10 预测</h2>
     <table>
       <thead><tr><th>#</th><th>号码</th><th>和值</th><th>跨度</th><th>形态</th><th>总分</th></tr></thead>
       <tbody>
-      {% for r in d3_pred.get('推荐', [])[:5] %}
+      {% for r in d3_pred.get('推荐', [])[:10] %}
         <tr>
           <td>{{ r.get('排名','') }}</td>
           <td class="num">{{ r.get('号码','') }}</td>
@@ -156,7 +143,7 @@
 </div>
 
 <!-- 快乐8概览 -->
-<div class="card" style="margin-top:20px">
+<div class="card" style="margin-bottom:20px">
   <h2>🎯 快乐8 预测</h2>
   {% if kl8_pred %}
     <p>预测期号：<strong>{{ kl8_pred.get('predicted_issue','?') }}</strong></p>
@@ -176,8 +163,14 @@
   {% endif %}
 </div>
 
+<!-- 命中率趋势图 -->
+<div class="card" style="margin-bottom:20px">
+  <h2>📊 命中率趋势（滚动窗口）</h2>
+  <div id="trend-chart" class="chart"></div>
+</div>
+
 <!-- 推送预览 -->
-<div class="grid-2" style="margin-top:20px">
+<div class="grid-2">
   <div class="card">
     <h2>📤 预测推送预览</h2>
     <pre style="white-space:pre-wrap;font-size:12px;color:var(--text2);line-height:1.6;max-height:500px;overflow-y:auto;background:var(--bg);padding:15px;border-radius:8px">{{ push_predict }}</pre>
@@ -188,43 +181,91 @@
   </div>
 </div>
 
+<style>
+.window-btn {
+  background: var(--bg3); color: var(--text2); border: 1px solid transparent;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.window-btn.active { background: var(--blue); color: var(--bg); border-color: var(--blue); }
+.window-btn:hover { border-color: var(--blue); }
+.metric-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.metric-bar .label { width: 80px; font-size: 12px; color: var(--text3); }
+.metric-bar .bar { flex: 1; height: 18px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.metric-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.metric-bar .value { width: 45px; text-align: right; font-size: 13px; font-weight: bold; }
+</style>
+
 <script>
+// 多维度指标数据
+var plsMetrics = {{ pls_metrics | tojson }};
+var d3Metrics = {{ d3_metrics | tojson }};
+
+function renderMetrics(containerId, metrics, window) {
+  var m = metrics[window] || {};
+  var el = document.getElementById(containerId);
+  if (!m.期数) { el.innerHTML = '<p class="empty">暂无数据</p>'; return; }
+
+  var dims = [
+    {key: '和值命中率', label: '和值命中', color: '#38bdf8'},
+    {key: '跨度命中率', label: '跨度命中', color: '#a78bfa'},
+    {key: '形态命中率', label: '形态命中', color: '#34d399'},
+    {key: '胆码双中率', label: '胆码双中', color: '#fbbf24'},
+    {key: '和值差近率', label: '和值差≤2', color: '#f472b6'},
+    {key: '跨度差近率', label: '跨度差≤1', color: '#fb923c'},
+  ];
+
+  var html = '<p style="font-size:12px;color:var(--text3);margin-bottom:10px">近' + m.期数 + '期 | 均和差' + m['平均和值差'] + ' | 均跨差' + m['平均跨度差'] + '</p>';
+  dims.forEach(function(d) {
+    var val = m[d.key] || 0;
+    html += '<div class="metric-bar">' +
+      '<span class="label">' + d.label + '</span>' +
+      '<div class="bar"><div class="bar-fill" style="width:' + Math.min(val, 100) + '%;background:' + d.color + '"></div></div>' +
+      '<span class="value">' + val + '%</span></div>';
+  });
+  el.innerHTML = html;
+}
+
+function switchWindow(w) {
+  document.querySelectorAll('.window-btn').forEach(function(b) { b.classList.remove('active'); });
+  event.target.classList.add('active');
+  renderMetrics('pls-metrics-content', plsMetrics, w);
+  renderMetrics('d3-metrics-content', d3Metrics, w);
+}
+
+// 默认显示 30 期
+renderMetrics('pls-metrics-content', plsMetrics, '30');
+renderMetrics('d3-metrics-content', d3Metrics, '30');
+
+// 趋势图
 (function() {
   var el = document.getElementById('trend-chart');
   if (!el) return;
 
-  // 加载趋势数据
   Promise.all([
     fetch('/api/metrics/pls/trend').then(function(r) { return r.json(); }).catch(function() { return []; }),
     fetch('/api/metrics/d3/trend').then(function(r) { return r.json(); }).catch(function() { return []; })
   ]).then(function(data) {
-    var plsTrend = data[0];
-    var d3Trend = data[1];
+    var plsTrend = data[0].slice(-60);
+    var d3Trend = data[1].slice(-60);
 
     if (!plsTrend.length && !d3Trend.length) {
-      el.innerHTML = '<p class="empty">暂无趋势数据。运行 <code>python scripts/metrics.py</code> 生成。</p>';
+      el.innerHTML = '<p class="empty">暂无趋势数据</p>';
       return;
     }
-
-    // 取最近 60 个数据点
-    plsTrend = plsTrend.slice(-60);
-    d3Trend = d3Trend.slice(-60);
 
     var chart = echarts.init(el);
     var series = [];
 
     if (plsTrend.length) {
       series.push(
-        { name: 'PLS 直选', type: 'line', data: plsTrend.map(function(d) { return d['直选命中率']; }), lineStyle: {width: 1}, itemStyle: {color: '#38bdf8'}, showSymbol: false },
-        { name: 'PLS 组选', type: 'line', data: plsTrend.map(function(d) { return d['组选命中率']; }), lineStyle: {width: 2}, itemStyle: {color: '#34d399'}, showSymbol: false },
-        { name: 'PLS 形态', type: 'line', data: plsTrend.map(function(d) { return d['形态命中率']; }), lineStyle: {width: 1, type: 'dashed'}, itemStyle: {color: '#fbbf24'}, showSymbol: false }
+        { name: 'PLS 和值命中', type: 'line', data: plsTrend.map(function(d) { return d['和值命中率']; }), lineStyle: {width: 2}, itemStyle: {color: '#38bdf8'}, showSymbol: false },
+        { name: 'PLS 形态命中', type: 'line', data: plsTrend.map(function(d) { return d['形态命中率']; }), lineStyle: {width: 1, type: 'dashed'}, itemStyle: {color: '#34d399'}, showSymbol: false }
       );
     }
     if (d3Trend.length) {
       series.push(
-        { name: 'D3 直选', type: 'line', data: d3Trend.map(function(d) { return d['直选命中率']; }), lineStyle: {width: 1}, itemStyle: {color: '#a78bfa'}, showSymbol: false },
-        { name: 'D3 组选', type: 'line', data: d3Trend.map(function(d) { return d['组选命中率']; }), lineStyle: {width: 2}, itemStyle: {color: '#f472b6'}, showSymbol: false },
-        { name: 'D3 形态', type: 'line', data: d3Trend.map(function(d) { return d['形态命中率']; }), lineStyle: {width: 1, type: 'dashed'}, itemStyle: {color: '#fb923c'}, showSymbol: false }
+        { name: 'D3 和值命中', type: 'line', data: d3Trend.map(function(d) { return d['和值命中率']; }), lineStyle: {width: 2}, itemStyle: {color: '#a78bfa'}, showSymbol: false },
+        { name: 'D3 形态命中', type: 'line', data: d3Trend.map(function(d) { return d['形态命中率']; }), lineStyle: {width: 1, type: 'dashed'}, itemStyle: {color: '#fbbf24'}, showSymbol: false }
       );
     }
 
@@ -235,7 +276,7 @@
       legend: { textStyle: { color: '#94a3b8' }, top: 0 },
       grid: { left: 50, right: 20, bottom: 40, top: 40 },
       xAxis: { type: 'category', data: issues, axisLabel: { color: '#64748b', rotate: 45, fontSize: 10 } },
-      yAxis: { type: 'value', axisLabel: { color: '#64748b', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#1e293b' } }, max: 50 },
+      yAxis: { type: 'value', axisLabel: { color: '#64748b', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#1e293b' } }, max: 100 },
       series: series
     });
     window.addEventListener('resize', function() { chart.resize(); });

@@ -82,18 +82,37 @@ def compute_metrics(rows, windows=None):
 
         direct = sum(1 for r in recent if get_hit(r, '直选命中'))
         group = sum(1 for r in recent if get_hit(r, '组选命中'))
-        morph = sum(1 for r in recent if safe_bool(r.get('Top1形态一致', '')))
-        sum_hit = sum(1 for r in recent if safe_bool(r.get('和值命中', '')))
-        span_hit = sum(1 for r in recent if safe_bool(r.get('跨度命中', '')))
+
+        # 形态命中：优先读字段，回退到 Top1形态一致
+        morph = sum(1 for r in recent if (
+            safe_bool(r.get('形态命中', '')) or
+            safe_bool(r.get('Top1形态一致', ''))
+        ))
+
+        # 和值命中：优先读字段，回退到 Top1和值误差 ≤ 2
+        sum_hit = sum(1 for r in recent if (
+            safe_bool(r.get('和值命中', '')) or
+            safe_int(r.get('Top1和值误差'), 99) <= 2
+        ))
+
+        # 跨度命中：优先读字段，回退到 Top1跨度误差 ≤ 1
+        span_hit = sum(1 for r in recent if (
+            safe_bool(r.get('跨度命中', '')) or
+            safe_int(r.get('Top1跨度误差'), 99) <= 1
+        ))
 
         # 胆码命中
         danma_single = sum(1 for r in recent if safe_int(r.get('胆码命中', 0)) == 1)
-        danma_double = sum(1 for r in recent if safe_int(r.get('胆码命中', 0)) == 2)
+        danma_double = sum(1 for r in recent if safe_int(r.get('胆码命中', 0)) >= 2)
         danma_triple = sum(1 for r in recent if safe_int(r.get('胆码命中', 0)) >= 3)
 
         # 和值误差
-        sum_errors = [safe_int(r.get('Top1和值误差', 0)) for r in recent]
-        span_errors = [safe_int(r.get('Top1跨度误差', 0)) for r in recent]
+        sum_errors = [safe_int(r.get('Top1和值误差'), 0) for r in recent]
+        span_errors = [safe_int(r.get('Top1跨度误差'), 0) for r in recent]
+
+        # 和值差≤2 / 跨度差≤1 的比例（比"命中率"更有参考价值）
+        sum_close = sum(1 for e in sum_errors if e <= 2)
+        span_close = sum(1 for e in span_errors if e <= 1)
 
         results[str(w)] = {
             '期数': n,
@@ -107,6 +126,10 @@ def compute_metrics(rows, windows=None):
             '和值命中率': round(sum_hit / n * 100, 1),
             '跨度命中': span_hit,
             '跨度命中率': round(span_hit / n * 100, 1),
+            '和值差近': sum_close,
+            '和值差近率': round(sum_close / n * 100, 1),
+            '跨度差近': span_close,
+            '跨度差近率': round(span_close / n * 100, 1),
             '胆码单中': danma_single,
             '胆码单中率': round(danma_single / n * 100, 1),
             '胆码双中': danma_double,

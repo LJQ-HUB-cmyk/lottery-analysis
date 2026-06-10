@@ -11,23 +11,35 @@
   {% if bt and bt.get('结果') %}
     {% set results = bt.get('结果', {}) %}
     <p style="color:var(--text3);font-size:12px;margin-bottom:10px">
-      回测 {{ bt.get('回测期数','?') }}期 | Top-K {{ bt.get('top_k','?') }} | 训练窗口 {{ bt.get('训练窗口','?') }}期
+      回测 {{ bt.get('回测期数','?') }}期 | Top-K {{ bt.get('top_k','?') }} | 训练窗口 {{ bt.get('训练窗口','?') }}期 | {{ bt.get('回测时间','') }}
     </p>
     <table>
       <thead><tr>
-        <th>策略</th><th>直选命中</th><th>组选命中</th><th>平均注数</th><th>ROI</th><th>最长连未中</th>
+        <th>策略</th><th>直选命中</th><th>组选命中</th><th>平均注数</th><th>ROI</th><th>最长连未中</th><th>总投入</th><th>总回报</th>
       </tr></thead>
       <tbody>
       {% for sname, sr in results.items() %}
-        <tr>
-          <td><strong>{{ sname }}</strong></td>
-          <td>{{ sr.get('直选命中','') }}</td>
-          <td>{{ sr.get('组选命中','') }}</td>
+        <tr class="strategy-row" onclick="toggleDetail('{{ lt }}-{{ loop.index }}')">
+          <td><strong>{{ sname }}</strong> ▸</td>
+          <td>{{ sr.get('直选命中','') }}/{{ bt.get('回测期数','?') }}</td>
+          <td>{{ sr.get('组选命中','') }}/{{ bt.get('回测期数','?') }}</td>
           <td>{{ sr.get('平均注数','') }}</td>
-          <td style="color:{% if sr.get('ROI','').startswith('-') %}var(--red){% else %}var(--green){% endif %}">
+          <td style="color:{% if sr.get('ROI','').startswith('-') %}var(--red){% else %}var(--green){% endif %};font-weight:bold">
             {{ sr.get('ROI','') }}
           </td>
-          <td>{{ sr.get('最大连续未中','') }}</td>
+          <td>{{ sr.get('最大连续未中','') }}期</td>
+          <td>{{ sr.get('总投入','') }}</td>
+          <td>{{ sr.get('总回报','') }}</td>
+        </tr>
+        <tr class="detail-row" id="detail-{{ lt }}-{{ loop.index }}" style="display:none">
+          <td colspan="8" style="padding:10px 20px;background:var(--bg)">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+              <div><span style="color:var(--text3)">直选命中率</span><br><strong>{{ sr.get('直选命中率','') }}</strong></div>
+              <div><span style="color:var(--text3)">组选命中率</span><br><strong>{{ sr.get('组选命中率','') }}</strong></div>
+              <div><span style="color:var(--text3)">直选ROI</span><br><strong>{{ sr.get('直选ROI','') }}</strong></div>
+              <div><span style="color:var(--text3)">组选ROI</span><br><strong>{{ sr.get('组选ROI','') }}</strong></div>
+            </div>
+          </td>
         </tr>
       {% endfor %}
       </tbody>
@@ -69,7 +81,17 @@
   {% endif %}
 </div>
 
+<style>
+.strategy-row { cursor: pointer; }
+.strategy-row:hover { background: var(--bg3); }
+</style>
+
 <script>
+function toggleDetail(id) {
+  var el = document.getElementById('detail-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
 (function() {
   var configs = [
     { id: 'roi-chart-pls', data: {{ pls_bt | tojson }} },

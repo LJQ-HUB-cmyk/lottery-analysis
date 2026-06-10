@@ -145,11 +145,21 @@ async def lottery_page(request: Request, lottery: str):
 async def kl8_page(request: Request):
     """快乐8页面"""
     from web.routes.helpers import read_json
+    from scripts.push_formatter import build_kl8_predict_message, build_kl8_review_message
 
     pred = read_json(BASE / "output" / "kl8" / "kl8_predict_latest.json")
     review = read_json(BASE / "output" / "kl8" / "kl8_review_latest.json")
     metrics = read_json(BASE / "output" / "kl8" / "kl8_metrics.json")
     stats = read_json(BASE / "output" / "kl8" / "kl8_stats.json")
+
+    try:
+        push_kl8_pred = build_kl8_predict_message()
+    except Exception:
+        push_kl8_pred = "生成失败"
+    try:
+        push_kl8_review = build_kl8_review_message()
+    except Exception:
+        push_kl8_review = "生成失败"
 
     return templates.TemplateResponse(
         request=request, name="kl8.html",
@@ -158,6 +168,8 @@ async def kl8_page(request: Request):
             "review": review,
             "metrics": metrics,
             "stats": stats,
+            "push_kl8_pred": push_kl8_pred,
+            "push_kl8_review": push_kl8_review,
         },
     )
 
